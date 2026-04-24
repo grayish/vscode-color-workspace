@@ -54,3 +54,29 @@ func TestColor_IsLight(t *testing.T) {
 		t.Error("gray 128 should be light (brightness == 128 threshold)")
 	}
 }
+
+func TestColor_HSLRoundtrip(t *testing.T) {
+	tests := []Color{
+		{255, 0, 0}, {0, 255, 0}, {0, 0, 255},
+		{90, 59, 140}, {255, 255, 255}, {0, 0, 0},
+	}
+	for _, c := range tests {
+		h, s, l := c.ToHSL()
+		back := FromHSL(h, s, l)
+		dr := abs(int(c.R) - int(back.R))
+		dg := abs(int(c.G) - int(back.G))
+		db := abs(int(c.B) - int(back.B))
+		if dr > 1 || dg > 1 || db > 1 {
+			t.Errorf("Roundtrip(%v) -> %v (diff r=%d g=%d b=%d)", c, back, dr, dg, db)
+		}
+	}
+}
+
+func abs(x int) int { if x < 0 { return -x }; return x }
+
+func TestColor_ToHSL_Hue(t *testing.T) {
+	h, _, _ := (Color{255, 0, 0}).ToHSL()
+	if h < -0.5 || h > 0.5 { t.Errorf("red hue = %f, want ~0", h) }
+	h, _, _ = (Color{0, 255, 0}).ToHSL()
+	if h < 119.5 || h > 120.5 { t.Errorf("green hue = %f, want ~120", h) }
+}
