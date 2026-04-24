@@ -57,7 +57,7 @@ function getReadableAccent(bg, ratio) {
 
 function complement(c) { return formatHex(tinycolor(c).complement()); }
 
-function elementStyle(bg) {
+function styleOf(bg) {
   return {
     bg: getBgHex(bg),
     bgHover: getHover(bg),
@@ -68,41 +68,52 @@ function elementStyle(bg) {
   };
 }
 
+function adjustedOf(bg, adjustment) {
+  if (!adjustment || adjustment === 'none') return bg;
+  const c = tinycolor(bg);
+  if (adjustment === 'lighten') return formatHex(c.lighten());
+  if (adjustment === 'darken')  return formatHex(c.darken());
+  return bg;
+}
+
 function prepareColors(bg, opts) {
   const out = {};
-  const style = elementStyle(bg);
-  const debugBg = complement(bg);
+  const adj = opts.elementAdjustments || {};
+  const titleStyle    = styleOf(adjustedOf(bg, adj.titleBar));
+  const activityStyle = styleOf(adjustedOf(bg, adj.activityBar));
+  const statusStyle   = styleOf(adjustedOf(bg, adj.statusBar));
+  const debugBg = complement(statusStyle.bg);
 
   if (opts.titleBar) {
-    out['titleBar.activeBackground'] = style.bg;
-    if (opts.statusAndTitleBorders) out['titleBar.border'] = style.bg;
-    out['titleBar.inactiveBackground'] = style.inactiveBg;
+    out['titleBar.activeBackground'] = titleStyle.bg;
+    if (opts.statusAndTitleBorders) out['titleBar.border'] = titleStyle.bg;
+    out['titleBar.inactiveBackground'] = titleStyle.inactiveBg;
     if (!opts.keepForegroundColor) {
-      out['titleBar.activeForeground'] = style.fg;
-      out['titleBar.inactiveForeground'] = style.inactiveFg;
-      out['commandCenter.border'] = style.inactiveFg;
+      out['titleBar.activeForeground'] = titleStyle.fg;
+      out['titleBar.inactiveForeground'] = titleStyle.inactiveFg;
+      out['commandCenter.border'] = titleStyle.inactiveFg;
     }
   }
   if (opts.activityBar) {
-    out['activityBar.background'] = style.bg;
-    out['activityBar.activeBackground'] = style.bg;
+    out['activityBar.background'] = activityStyle.bg;
+    out['activityBar.activeBackground'] = activityStyle.bg;
     if (!opts.keepForegroundColor) {
-      out['activityBar.foreground'] = style.fg;
-      out['activityBar.inactiveForeground'] = style.inactiveFg;
+      out['activityBar.foreground'] = activityStyle.fg;
+      out['activityBar.inactiveForeground'] = activityStyle.inactiveFg;
     }
     if (!opts.keepBadgeColor) {
-      out['activityBarBadge.background'] = style.badgeBg;
-      out['activityBarBadge.foreground'] = getFg(style.badgeBg);
+      out['activityBarBadge.background'] = activityStyle.badgeBg;
+      out['activityBarBadge.foreground'] = getFg(activityStyle.badgeBg);
     }
   }
   if (opts.statusBar) {
-    out['statusBar.background'] = style.bg;
-    out['statusBarItem.hoverBackground'] = style.bgHover;
-    out['statusBarItem.remoteBackground'] = style.bg;
-    if (opts.statusAndTitleBorders) out['statusBar.border'] = style.bg;
+    out['statusBar.background'] = statusStyle.bg;
+    out['statusBarItem.hoverBackground'] = statusStyle.bgHover;
+    out['statusBarItem.remoteBackground'] = statusStyle.bg;
+    if (opts.statusAndTitleBorders) out['statusBar.border'] = statusStyle.bg;
     if (!opts.keepForegroundColor) {
-      out['statusBar.foreground'] = style.fg;
-      out['statusBarItem.remoteForeground'] = style.fg;
+      out['statusBar.foreground'] = statusStyle.fg;
+      out['statusBarItem.remoteForeground'] = statusStyle.fg;
     }
     if (opts.debuggingStatusBar) {
       out['statusBar.debuggingBackground'] = debugBg;
@@ -110,11 +121,12 @@ function prepareColors(bg, opts) {
       if (!opts.keepForegroundColor) out['statusBar.debuggingForeground'] = getFg(debugBg);
     }
   }
-  if (opts.editorGroupBorder) out['editorGroup.border'] = style.bg;
-  if (opts.panelBorder) out['panel.border'] = style.bg;
-  if (opts.sideBarBorder) out['sideBar.border'] = style.bg;
-  if (opts.sashHover) out['sash.hoverBorder'] = style.bg;
-  if (opts.tabActiveBorder) out['tab.activeBorder'] = style.bg;
+  // Accent borders use activityBar's adjusted color (matches Peacock).
+  if (opts.editorGroupBorder) out['editorGroup.border'] = activityStyle.bg;
+  if (opts.panelBorder) out['panel.border'] = activityStyle.bg;
+  if (opts.sideBarBorder) out['sideBar.border'] = activityStyle.bg;
+  if (opts.sashHover) out['sash.hoverBorder'] = activityStyle.bg;
+  if (opts.tabActiveBorder) out['tab.activeBorder'] = activityStyle.bg;
   if (opts.squigglyBeGone) {
     out['editorError.foreground'] = '#00000000';
     out['editorWarning.foreground'] = '#00000000';
@@ -137,13 +149,20 @@ const fixtures = [
   { base: '#5a3b8c', label: 'purple', opts: defaultOpts },
   { base: '#000000', label: 'black', opts: defaultOpts },
   { base: '#ffffff', label: 'white', opts: defaultOpts },
+  {
+    base: '#5a3b8c',
+    label: 'purple_activity_lighten_title_darken',
+    opts: defaultOpts,
+    adj: { activityBar: 'lighten', titleBar: 'darken' },
+  },
 ];
 
 const output = fixtures.map(f => ({
   base: f.base,
   label: f.label,
   opts: f.opts,
-  palette: prepareColors(f.base, f.opts),
+  elementAdjustments: f.adj || {},
+  palette: prepareColors(f.base, { ...f.opts, elementAdjustments: f.adj }),
 }));
 
 process.stdout.write(JSON.stringify(output, null, 2) + '\n');

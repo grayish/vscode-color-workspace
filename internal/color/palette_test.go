@@ -18,7 +18,7 @@ func TestDefaultOptions(t *testing.T) {
 func TestElementStyle_Derivatives(t *testing.T) {
 	base := Color{90, 59, 140}
 	opts := DefaultOptions()
-	style := elementStyle(base, opts)
+	style := elementStyle(base, AdjustNone, opts)
 	if style.Background != base {
 		t.Errorf("background mismatch")
 	}
@@ -230,5 +230,75 @@ func TestPalette_AllOn(t *testing.T) {
 	out := Palette(base, opts)
 	if len(out) < 25 {
 		t.Errorf("all-on palette has %d keys, want >= 25", len(out))
+	}
+}
+
+func TestApplyAdjustment(t *testing.T) {
+	base := Color{128, 128, 128}
+	if applyAdjustment(base, AdjustNone, 10) != base {
+		t.Error("None should be noop")
+	}
+	light := applyAdjustment(base, AdjustLighten, 10)
+	if light.Brightness() <= base.Brightness() {
+		t.Error("Lighten should brighten")
+	}
+	dark := applyAdjustment(base, AdjustDarken, 10)
+	if dark.Brightness() >= base.Brightness() {
+		t.Error("Darken should darken")
+	}
+}
+
+func TestCollectActivityBar_Adjusted(t *testing.T) {
+	base := Color{90, 59, 140}
+	opts := DefaultOptions()
+	opts.Adjust.ActivityBar = AdjustLighten
+	out := collectActivityBar(base, opts)
+	if out["activityBar.background"] == base.Hex() {
+		t.Error("activityBar should be lightened, not base")
+	}
+}
+
+func TestCollectTitleBar_Adjusted(t *testing.T) {
+	base := Color{90, 59, 140}
+	opts := DefaultOptions()
+	opts.Adjust.TitleBar = AdjustDarken
+	out := collectTitleBar(base, opts)
+	if out["titleBar.activeBackground"] == base.Hex() {
+		t.Error("titleBar should be darkened, not base")
+	}
+}
+
+func TestCollectStatusBar_Adjusted(t *testing.T) {
+	base := Color{90, 59, 140}
+	opts := DefaultOptions()
+	opts.Adjust.StatusBar = AdjustLighten
+	out := collectStatusBar(base, opts)
+	if out["statusBar.background"] == base.Hex() {
+		t.Error("statusBar should be lightened, not base")
+	}
+}
+
+func TestPalette_ElementAdjustments_Differentiate(t *testing.T) {
+	base := Color{90, 59, 140}
+	opts := DefaultOptions()
+	opts.Adjust.ActivityBar = AdjustLighten
+	opts.Adjust.TitleBar = AdjustDarken
+	out := Palette(base, opts)
+	if out["activityBar.background"] == out["titleBar.activeBackground"] {
+		t.Error("activityBar and titleBar should differ after adjustments")
+	}
+	if out["statusBar.background"] != base.Hex() {
+		t.Error("statusBar (no adjustment) should match base")
+	}
+}
+
+func TestCollectAccentBorder_UsesActivityBarAdjustment(t *testing.T) {
+	base := Color{90, 59, 140}
+	opts := DefaultOptions()
+	opts.Affect.EditorGroupBorder = true
+	opts.Adjust.ActivityBar = AdjustLighten
+	out := collectAccentBorder(base, opts)
+	if out["editorGroup.border"] == base.Hex() {
+		t.Error("border should use adjusted activityBar color")
 	}
 }

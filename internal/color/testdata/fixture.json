@@ -17,6 +17,7 @@
       "keepBadgeColor": false,
       "squigglyBeGone": false
     },
+    "elementAdjustments": {},
     "palette": {
       "titleBar.activeBackground": "#ff0000",
       "titleBar.inactiveBackground": "#ff000099",
@@ -54,6 +55,7 @@
       "keepBadgeColor": false,
       "squigglyBeGone": false
     },
+    "elementAdjustments": {},
     "palette": {
       "titleBar.activeBackground": "#42b883",
       "titleBar.inactiveBackground": "#42b88399",
@@ -91,6 +93,7 @@
       "keepBadgeColor": false,
       "squigglyBeGone": false
     },
+    "elementAdjustments": {},
     "palette": {
       "titleBar.activeBackground": "#5a3b8c",
       "titleBar.inactiveBackground": "#5a3b8c99",
@@ -128,6 +131,7 @@
       "keepBadgeColor": false,
       "squigglyBeGone": false
     },
+    "elementAdjustments": {},
     "palette": {
       "titleBar.activeBackground": "#000000",
       "titleBar.inactiveBackground": "#00000099",
@@ -165,6 +169,7 @@
       "keepBadgeColor": false,
       "squigglyBeGone": false
     },
+    "elementAdjustments": {},
     "palette": {
       "titleBar.activeBackground": "#ffffff",
       "titleBar.inactiveBackground": "#ffffff99",
@@ -182,6 +187,47 @@
       "statusBarItem.remoteBackground": "#ffffff",
       "statusBar.foreground": "#15202b",
       "statusBarItem.remoteForeground": "#15202b"
+    }
+  },
+  {
+    "base": "#5a3b8c",
+    "label": "purple_activity_lighten_title_darken",
+    "opts": {
+      "activityBar": true,
+      "statusBar": true,
+      "titleBar": true,
+      "editorGroupBorder": false,
+      "panelBorder": false,
+      "sideBarBorder": false,
+      "sashHover": false,
+      "statusAndTitleBorders": false,
+      "debuggingStatusBar": false,
+      "tabActiveBorder": false,
+      "keepForegroundColor": false,
+      "keepBadgeColor": false,
+      "squigglyBeGone": false
+    },
+    "elementAdjustments": {
+      "activityBar": "lighten",
+      "titleBar": "darken"
+    },
+    "palette": {
+      "titleBar.activeBackground": "#432c68",
+      "titleBar.inactiveBackground": "#432c6899",
+      "titleBar.activeForeground": "#e7e7e7",
+      "titleBar.inactiveForeground": "#e7e7e799",
+      "commandCenter.border": "#e7e7e799",
+      "activityBar.background": "#714ab0",
+      "activityBar.activeBackground": "#714ab0",
+      "activityBar.foreground": "#e7e7e7",
+      "activityBar.inactiveForeground": "#e7e7e799",
+      "activityBarBadge.background": "#bd8562",
+      "activityBarBadge.foreground": "#15202b",
+      "statusBar.background": "#5a3b8c",
+      "statusBarItem.hoverBackground": "#714ab0",
+      "statusBarItem.remoteBackground": "#5a3b8c",
+      "statusBar.foreground": "#e7e7e7",
+      "statusBarItem.remoteForeground": "#e7e7e7"
     }
   }
 ]

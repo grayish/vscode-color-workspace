@@ -7,6 +7,7 @@ import (
 
 	"github.com/charmbracelet/huh"
 
+	"github.com/sang-bin/vscode-color-workspace/internal/color"
 	"github.com/sang-bin/vscode-color-workspace/internal/runner"
 	"github.com/sang-bin/vscode-color-workspace/internal/vscodesettings"
 )
@@ -28,6 +29,10 @@ type Choices struct {
 	AffectDebuggingStatusBar    bool
 	AffectTabActiveBorder       bool
 
+	AdjustActivityBar string
+	AdjustStatusBar   string
+	AdjustTitleBar    string
+
 	DeleteSource bool
 	OpenAfter    bool
 	Advanced     bool
@@ -46,6 +51,9 @@ func Run(initialTarget string) (*Choices, error) {
 		AffectActivityBar: true,
 		AffectStatusBar:   true,
 		AffectTitleBar:    true,
+		AdjustActivityBar: "none",
+		AdjustStatusBar:   "none",
+		AdjustTitleBar:    "none",
 		DeleteSource:      true,
 		OpenAfter:         true,
 		DarkenLightenPct:  "10",
@@ -85,6 +93,12 @@ func Run(initialTarget string) (*Choices, error) {
 	}
 	affectsSelected := []string{"activityBar", "statusBar", "titleBar"}
 
+	adjOpts := []huh.Option[string]{
+		huh.NewOption("None", "none"),
+		huh.NewOption("Lighten (10%)", "lighten"),
+		huh.NewOption("Darken (10%)", "darken"),
+	}
+
 	form := huh.NewForm(
 		huh.NewGroup(
 			huh.NewInput().Title("Target directory").Value(&c.TargetDir),
@@ -97,6 +111,11 @@ func Run(initialTarget string) (*Choices, error) {
 		).WithHideFunc(func() bool { return c.ColorSource != "custom" }),
 		huh.NewGroup(
 			huh.NewMultiSelect[string]().Title("Affected elements").Options(affectsMulti...).Value(&affectsSelected),
+		),
+		huh.NewGroup(
+			huh.NewSelect[string]().Title("Adjust activityBar").Options(adjOpts...).Value(&c.AdjustActivityBar),
+			huh.NewSelect[string]().Title("Adjust statusBar").Options(adjOpts...).Value(&c.AdjustStatusBar),
+			huh.NewSelect[string]().Title("Adjust titleBar").Options(adjOpts...).Value(&c.AdjustTitleBar),
 		),
 		huh.NewGroup(
 			huh.NewConfirm().Title("Delete peacock settings from .vscode/settings.json?").
@@ -166,6 +185,9 @@ func ApplyToOptions(c Choices, targetDir string) runner.Options {
 	opts.Palette.Affect.StatusAndTitleBorders = c.AffectStatusAndTitleBorders
 	opts.Palette.Affect.DebuggingStatusBar = c.AffectDebuggingStatusBar
 	opts.Palette.Affect.TabActiveBorder = c.AffectTabActiveBorder
+	opts.Palette.Adjust.ActivityBar = parseAdjChoice(c.AdjustActivityBar)
+	opts.Palette.Adjust.StatusBar = parseAdjChoice(c.AdjustStatusBar)
+	opts.Palette.Adjust.TitleBar = parseAdjChoice(c.AdjustTitleBar)
 	if c.Advanced {
 		opts.Palette.Standard.KeepForegroundColor = c.KeepForegroundColor
 		opts.Palette.Standard.KeepBadgeColor = c.KeepBadgeColor
@@ -181,4 +203,14 @@ func parseFloat(s string) (float64, error) {
 	var v float64
 	_, err := fmt.Sscanf(s, "%f", &v)
 	return v, err
+}
+
+func parseAdjChoice(s string) color.Adjustment {
+	switch s {
+	case "lighten":
+		return color.AdjustLighten
+	case "darken":
+		return color.AdjustDarken
+	}
+	return color.AdjustNone
 }

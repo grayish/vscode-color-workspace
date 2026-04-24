@@ -24,9 +24,27 @@ type StandardOptions struct {
 	LightForegroundHex  string
 }
 
+// Adjustment is a per-element lighten/darken toggle.
+type Adjustment int
+
+const (
+	AdjustNone Adjustment = iota
+	AdjustLighten
+	AdjustDarken
+)
+
+// AdjustOptions lets each main bar be independently lightened, darkened,
+// or left at base. Mirrors Peacock's elementAdjustments.
+type AdjustOptions struct {
+	ActivityBar Adjustment
+	StatusBar   Adjustment
+	TitleBar    Adjustment
+}
+
 // Options is the full palette configuration.
 type Options struct {
 	Affect   AffectOptions
+	Adjust   AdjustOptions
 	Standard StandardOptions
 }
 
@@ -56,18 +74,31 @@ type elementStyleT struct {
 	BadgeForeground    Color
 }
 
-func elementStyle(base Color, opts Options) elementStyleT {
-	fg := foregroundFor(base, opts)
-	badgeBg := ReadableAccent(base, RatioUILow)
+func elementStyle(base Color, adj Adjustment, opts Options) elementStyleT {
+	pct := hoverPct(opts)
+	adjusted := applyAdjustment(base, adj, pct)
+	fg := foregroundFor(adjusted, opts)
+	badgeBg := ReadableAccent(adjusted, RatioUILow)
 	badgeFg := foregroundFor(badgeBg, opts)
 	return elementStyleT{
-		Background:         base,
-		BackgroundHover:    hoverOfAmount(base, hoverPct(opts)),
-		Inactive:           base,
+		Background:         adjusted,
+		BackgroundHover:    hoverOfAmount(adjusted, pct),
+		Inactive:           adjusted,
 		Foreground:         fg,
 		InactiveForeground: fg,
 		BadgeBackground:    badgeBg,
 		BadgeForeground:    badgeFg,
+	}
+}
+
+func applyAdjustment(base Color, adj Adjustment, pct float64) Color {
+	switch adj {
+	case AdjustLighten:
+		return base.Lighten(pct)
+	case AdjustDarken:
+		return base.Darken(pct)
+	default:
+		return base
 	}
 }
 
@@ -100,7 +131,7 @@ func collectStatusBar(base Color, opts Options) map[string]string {
 	if !opts.Affect.StatusBar {
 		return out
 	}
-	style := elementStyle(base, opts)
+	style := elementStyle(base, opts.Adjust.StatusBar, opts)
 	out["statusBar.background"] = style.Background.Hex()
 	out["statusBarItem.hoverBackground"] = style.BackgroundHover.Hex()
 	out["statusBarItem.remoteBackground"] = style.Background.Hex()
@@ -113,7 +144,7 @@ func collectStatusBar(base Color, opts Options) map[string]string {
 		out["statusBarItem.remoteForeground"] = style.Foreground.Hex()
 	}
 	if opts.Affect.DebuggingStatusBar {
-		debugBg := base.Complement()
+		debugBg := style.Background.Complement()
 		out["statusBar.debuggingBackground"] = debugBg.Hex()
 		if opts.Affect.StatusAndTitleBorders {
 			out["statusBar.debuggingBorder"] = debugBg.Hex()
@@ -130,7 +161,7 @@ func collectActivityBar(base Color, opts Options) map[string]string {
 	if !opts.Affect.ActivityBar {
 		return out
 	}
-	style := elementStyle(base, opts)
+	style := elementStyle(base, opts.Adjust.ActivityBar, opts)
 	out["activityBar.background"] = style.Background.Hex()
 	out["activityBar.activeBackground"] = style.Background.Hex()
 	if !opts.Standard.KeepForegroundColor {
@@ -150,7 +181,7 @@ func collectTitleBar(base Color, opts Options) map[string]string {
 	if !opts.Affect.TitleBar {
 		return out
 	}
-	style := elementStyle(base, opts)
+	style := elementStyle(base, opts.Adjust.TitleBar, opts)
 	out["titleBar.activeBackground"] = style.Background.Hex()
 	if opts.Affect.StatusAndTitleBorders {
 		out["titleBar.border"] = style.Background.Hex()
@@ -166,7 +197,7 @@ func collectTitleBar(base Color, opts Options) map[string]string {
 
 func collectAccentBorder(base Color, opts Options) map[string]string {
 	out := map[string]string{}
-	hex := base.Hex()
+	hex := applyAdjustment(base, opts.Adjust.ActivityBar, hoverPct(opts)).Hex()
 	if opts.Affect.EditorGroupBorder {
 		out["editorGroup.border"] = hex
 	}

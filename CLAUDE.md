@@ -55,4 +55,4 @@ cmd/ccws → runner, interactive
 
 ## Non-goals (don't add these without design discussion)
 
-Peacock favorites, `peacock.remoteColor` / Live Share, multi-root workspaces, per-element lighten/darken adjustments, VSCode Profiles integration, `.code-workspace` comment preservation on rewrite, uninstall subcommand.
+Peacock favorites, `peacock.remoteColor` / Live Share, multi-root workspaces, VSCode Profiles integration, `.code-workspace` comment preservation on rewrite, uninstall subcommand.
