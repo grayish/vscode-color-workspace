@@ -4,6 +4,7 @@ package color
 
 import (
 	"fmt"
+	"math"
 
 	"github.com/lucasb-eyer/go-colorful"
 )
@@ -93,4 +94,27 @@ func (c Color) Lighten(pct float64) Color {
 func (c Color) Darken(pct float64) Color {
 	h, s, l := c.ToHSL()
 	return FromHSL(h, s, l-pct/100)
+}
+
+// RelativeLuminance returns WCAG 2.1 relative luminance in [0, 1].
+func (c Color) RelativeLuminance() float64 {
+	return 0.2126*linearize(float64(c.R)/255) +
+		0.7152*linearize(float64(c.G)/255) +
+		0.0722*linearize(float64(c.B)/255)
+}
+
+func linearize(v float64) float64 {
+	if v <= 0.03928 {
+		return v / 12.92
+	}
+	return math.Pow((v+0.055)/1.055, 2.4)
+}
+
+// Contrast returns WCAG contrast ratio (1 to 21).
+func Contrast(a, b Color) float64 {
+	la, lb := a.RelativeLuminance(), b.RelativeLuminance()
+	if la < lb {
+		la, lb = lb, la
+	}
+	return (la + 0.05) / (lb + 0.05)
 }
