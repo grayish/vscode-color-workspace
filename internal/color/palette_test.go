@@ -19,7 +19,9 @@ func TestElementStyle_Derivatives(t *testing.T) {
 	base := Color{90, 59, 140}
 	opts := DefaultOptions()
 	style := elementStyle(base, opts)
-	if style.Background != base { t.Errorf("background mismatch") }
+	if style.Background != base {
+		t.Errorf("background mismatch")
+	}
 	if style.Foreground == style.Background {
 		t.Errorf("foreground should differ from background")
 	}
@@ -35,7 +37,9 @@ func TestCollectTitleBar_Defaults(t *testing.T) {
 		"commandCenter.border",
 	}
 	for _, k := range must {
-		if _, ok := out[k]; !ok { t.Errorf("missing key %q", k) }
+		if _, ok := out[k]; !ok {
+			t.Errorf("missing key %q", k)
+		}
 	}
 	if out["titleBar.activeBackground"] != "#5a3b8c" {
 		t.Errorf("activeBackground = %q, want #5a3b8c", out["titleBar.activeBackground"])
@@ -50,7 +54,9 @@ func TestCollectTitleBar_Disabled(t *testing.T) {
 	opts := DefaultOptions()
 	opts.Affect.TitleBar = false
 	out := collectTitleBar(base, opts)
-	if len(out) != 0 { t.Errorf("disabled titleBar returned %d keys, want 0", len(out)) }
+	if len(out) != 0 {
+		t.Errorf("disabled titleBar returned %d keys, want 0", len(out))
+	}
 }
 
 func TestCollectTitleBar_KeepForeground(t *testing.T) {
@@ -89,7 +95,9 @@ func TestCollectActivityBar_Defaults(t *testing.T) {
 		"activityBarBadge.background", "activityBarBadge.foreground",
 	}
 	for _, k := range must {
-		if _, ok := out[k]; !ok { t.Errorf("missing %q", k) }
+		if _, ok := out[k]; !ok {
+			t.Errorf("missing %q", k)
+		}
 	}
 	if out["activityBar.background"] != out["activityBar.activeBackground"] {
 		t.Error("background and activeBackground should match")
@@ -100,15 +108,21 @@ func TestCollectActivityBar_KeepBadge(t *testing.T) {
 	opts := DefaultOptions()
 	opts.Standard.KeepBadgeColor = true
 	out := collectActivityBar(Color{90, 59, 140}, opts)
-	if _, ok := out["activityBarBadge.background"]; ok { t.Error("badge should be omitted") }
-	if _, ok := out["activityBarBadge.foreground"]; ok { t.Error("badge fg should be omitted") }
+	if _, ok := out["activityBarBadge.background"]; ok {
+		t.Error("badge should be omitted")
+	}
+	if _, ok := out["activityBarBadge.foreground"]; ok {
+		t.Error("badge fg should be omitted")
+	}
 }
 
 func TestCollectActivityBar_Disabled(t *testing.T) {
 	opts := DefaultOptions()
 	opts.Affect.ActivityBar = false
 	out := collectActivityBar(Color{90, 59, 140}, opts)
-	if len(out) != 0 { t.Errorf("disabled -> %d keys, want 0", len(out)) }
+	if len(out) != 0 {
+		t.Errorf("disabled -> %d keys, want 0", len(out))
+	}
 }
 
 func TestCollectStatusBar_Defaults(t *testing.T) {
@@ -120,7 +134,9 @@ func TestCollectStatusBar_Defaults(t *testing.T) {
 		"statusBarItem.remoteForeground",
 	}
 	for _, k := range must {
-		if _, ok := out[k]; !ok { t.Errorf("missing %q", k) }
+		if _, ok := out[k]; !ok {
+			t.Errorf("missing %q", k)
+		}
 	}
 }
 
@@ -128,8 +144,12 @@ func TestCollectStatusBar_Debugging(t *testing.T) {
 	opts := DefaultOptions()
 	opts.Affect.DebuggingStatusBar = true
 	out := collectStatusBar(Color{90, 59, 140}, opts)
-	if _, ok := out["statusBar.debuggingBackground"]; !ok { t.Error("expected debuggingBackground") }
-	if _, ok := out["statusBar.debuggingForeground"]; !ok { t.Error("expected debuggingForeground") }
+	if _, ok := out["statusBar.debuggingBackground"]; !ok {
+		t.Error("expected debuggingBackground")
+	}
+	if _, ok := out["statusBar.debuggingForeground"]; !ok {
+		t.Error("expected debuggingForeground")
+	}
 }
 
 func TestCollectStatusBar_BordersWithDebug(t *testing.T) {
@@ -137,8 +157,12 @@ func TestCollectStatusBar_BordersWithDebug(t *testing.T) {
 	opts.Affect.DebuggingStatusBar = true
 	opts.Affect.StatusAndTitleBorders = true
 	out := collectStatusBar(Color{90, 59, 140}, opts)
-	if _, ok := out["statusBar.border"]; !ok { t.Error("expected statusBar.border") }
-	if _, ok := out["statusBar.debuggingBorder"]; !ok { t.Error("expected statusBar.debuggingBorder") }
+	if _, ok := out["statusBar.border"]; !ok {
+		t.Error("expected statusBar.border")
+	}
+	if _, ok := out["statusBar.debuggingBorder"]; !ok {
+		t.Error("expected statusBar.debuggingBorder")
+	}
 }
 
 func TestCollectAccentBorder(t *testing.T) {
@@ -149,15 +173,21 @@ func TestCollectAccentBorder(t *testing.T) {
 	out := collectAccentBorder(Color{90, 59, 140}, opts)
 	want := []string{"editorGroup.border", "panel.border", "tab.activeBorder"}
 	for _, k := range want {
-		if out[k] != "#5a3b8c" { t.Errorf("%s = %q, want #5a3b8c", k, out[k]) }
+		if out[k] != "#5a3b8c" {
+			t.Errorf("%s = %q, want #5a3b8c", k, out[k])
+		}
 	}
-	if _, ok := out["sideBar.border"]; ok { t.Error("sideBar.border should be absent") }
+	if _, ok := out["sideBar.border"]; ok {
+		t.Error("sideBar.border should be absent")
+	}
 }
 
 func TestCollectSquigglyBeGone_Off(t *testing.T) {
 	opts := DefaultOptions()
 	out := collectSquigglyBeGone(opts)
-	if len(out) != 0 { t.Errorf("off -> len=%d", len(out)) }
+	if len(out) != 0 {
+		t.Errorf("off -> len=%d", len(out))
+	}
 }
 
 func TestCollectSquigglyBeGone_On(t *testing.T) {
@@ -165,7 +195,9 @@ func TestCollectSquigglyBeGone_On(t *testing.T) {
 	opts.Standard.SquigglyBeGone = true
 	out := collectSquigglyBeGone(opts)
 	for _, k := range []string{"editorError.foreground", "editorWarning.foreground", "editorInfo.foreground"} {
-		if out[k] != "#00000000" { t.Errorf("%s = %q, want #00000000", k, out[k]) }
+		if out[k] != "#00000000" {
+			t.Errorf("%s = %q, want #00000000", k, out[k])
+		}
 	}
 }
 
@@ -175,9 +207,13 @@ func TestPalette_DefaultsContainExpected(t *testing.T) {
 	for _, k := range []string{
 		"activityBar.background", "statusBar.background", "titleBar.activeBackground",
 	} {
-		if _, ok := out[k]; !ok { t.Errorf("missing %q", k) }
+		if _, ok := out[k]; !ok {
+			t.Errorf("missing %q", k)
+		}
 	}
-	if _, ok := out["editorGroup.border"]; ok { t.Error("editorGroup.border should be absent") }
+	if _, ok := out["editorGroup.border"]; ok {
+		t.Error("editorGroup.border should be absent")
+	}
 }
 
 func TestPalette_AllOn(t *testing.T) {

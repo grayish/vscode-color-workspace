@@ -72,11 +72,20 @@ func TestColor_HSLRoundtrip(t *testing.T) {
 	}
 }
 
-func abs(x int) int { if x < 0 { return -x }; return x }
+func abs(x int) int {
+	if x < 0 {
+		return -x
+	}
+	return x
+}
 
 func TestColor_ToHSL_Hue(t *testing.T) {
 	h, _, _ := (Color{255, 0, 0}).ToHSL()
-	if h < -0.5 || h > 0.5 { t.Errorf("red hue = %f, want ~0", h) }
+	if h < -0.5 || h > 0.5 {
+		t.Errorf("red hue = %f, want ~0", h)
+	}
 	h, _, _ = (Color{0, 255, 0}).ToHSL()
-	if h < 119.5 || h > 120.5 { t.Errorf("green hue = %f, want ~120", h) }
+	if h < 119.5 || h > 120.5 {
+		t.Errorf("green hue = %f, want ~120", h)
+	}
 }

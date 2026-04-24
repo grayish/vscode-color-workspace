@@ -1,15 +1,22 @@
 package color
 
-import ( "math"; "testing" )
+import (
+	"math"
+	"testing"
+)
 
 func TestContrast_BlackWhite(t *testing.T) {
 	c := Contrast(Color{0, 0, 0}, Color{255, 255, 255})
-	if math.Abs(c-21) > 0.01 { t.Errorf("contrast(black, white) = %f, want ~21", c) }
+	if math.Abs(c-21) > 0.01 {
+		t.Errorf("contrast(black, white) = %f, want ~21", c)
+	}
 }
 
 func TestContrast_Symmetric(t *testing.T) {
 	a, b := Color{255, 0, 0}, Color{0, 0, 255}
-	if Contrast(a, b) != Contrast(b, a) { t.Error("contrast should be symmetric") }
+	if Contrast(a, b) != Contrast(b, a) {
+		t.Error("contrast should be symmetric")
+	}
 }
 
 func TestContrast_Same(t *testing.T) {

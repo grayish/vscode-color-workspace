@@ -13,7 +13,9 @@ func TestReadableAccent_MeetsRatio(t *testing.T) {
 func TestReadableAccent_Grayscale(t *testing.T) {
 	base := Color{128, 128, 128}
 	accent := ReadableAccent(base, 2.0)
-	if accent == base { t.Errorf("accent same as grayscale base") }
+	if accent == base {
+		t.Errorf("accent same as grayscale base")
+	}
 }
 
 func TestReadableAccent_ExtremeBase(t *testing.T) {

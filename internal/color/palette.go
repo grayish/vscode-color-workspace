@@ -75,10 +75,14 @@ func foregroundFor(bg Color, opts Options) Color {
 	var hex string
 	if bg.IsLight() {
 		hex = opts.Standard.DarkForegroundHex
-		if hex == "" { hex = "#15202b" }
+		if hex == "" {
+			hex = "#15202b"
+		}
 	} else {
 		hex = opts.Standard.LightForegroundHex
-		if hex == "" { hex = "#e7e7e7" }
+		if hex == "" {
+			hex = "#e7e7e7"
+		}
 	}
 	c, _ := parseHex(hex)
 	return c
@@ -93,7 +97,9 @@ func hoverPct(opts Options) float64 {
 
 func collectStatusBar(base Color, opts Options) map[string]string {
 	out := map[string]string{}
-	if !opts.Affect.StatusBar { return out }
+	if !opts.Affect.StatusBar {
+		return out
+	}
 	style := elementStyle(base, opts)
 	out["statusBar.background"] = style.Background.Hex()
 	out["statusBarItem.hoverBackground"] = style.BackgroundHover.Hex()
@@ -121,7 +127,9 @@ func collectStatusBar(base Color, opts Options) map[string]string {
 
 func collectActivityBar(base Color, opts Options) map[string]string {
 	out := map[string]string{}
-	if !opts.Affect.ActivityBar { return out }
+	if !opts.Affect.ActivityBar {
+		return out
+	}
 	style := elementStyle(base, opts)
 	out["activityBar.background"] = style.Background.Hex()
 	out["activityBar.activeBackground"] = style.Background.Hex()
@@ -139,7 +147,9 @@ func collectActivityBar(base Color, opts Options) map[string]string {
 // collectTitleBar ports collectTitleBarSettings from Peacock.
 func collectTitleBar(base Color, opts Options) map[string]string {
 	out := map[string]string{}
-	if !opts.Affect.TitleBar { return out }
+	if !opts.Affect.TitleBar {
+		return out
+	}
 	style := elementStyle(base, opts)
 	out["titleBar.activeBackground"] = style.Background.Hex()
 	if opts.Affect.StatusAndTitleBorders {
@@ -157,17 +167,29 @@ func collectTitleBar(base Color, opts Options) map[string]string {
 func collectAccentBorder(base Color, opts Options) map[string]string {
 	out := map[string]string{}
 	hex := base.Hex()
-	if opts.Affect.EditorGroupBorder { out["editorGroup.border"] = hex }
-	if opts.Affect.PanelBorder { out["panel.border"] = hex }
-	if opts.Affect.SideBarBorder { out["sideBar.border"] = hex }
-	if opts.Affect.SashHover { out["sash.hoverBorder"] = hex }
-	if opts.Affect.TabActiveBorder { out["tab.activeBorder"] = hex }
+	if opts.Affect.EditorGroupBorder {
+		out["editorGroup.border"] = hex
+	}
+	if opts.Affect.PanelBorder {
+		out["panel.border"] = hex
+	}
+	if opts.Affect.SideBarBorder {
+		out["sideBar.border"] = hex
+	}
+	if opts.Affect.SashHover {
+		out["sash.hoverBorder"] = hex
+	}
+	if opts.Affect.TabActiveBorder {
+		out["tab.activeBorder"] = hex
+	}
 	return out
 }
 
 func collectSquigglyBeGone(opts Options) map[string]string {
 	out := map[string]string{}
-	if !opts.Standard.SquigglyBeGone { return out }
+	if !opts.Standard.SquigglyBeGone {
+		return out
+	}
 	const transparent = "#00000000"
 	out["editorError.foreground"] = transparent
 	out["editorWarning.foreground"] = transparent
@@ -182,8 +204,12 @@ func Palette(base Color, opts Options) map[string]string {
 	for _, f := range []func(Color, Options) map[string]string{
 		collectTitleBar, collectActivityBar, collectStatusBar, collectAccentBorder,
 	} {
-		for k, v := range f(base, opts) { out[k] = v }
+		for k, v := range f(base, opts) {
+			out[k] = v
+		}
 	}
-	for k, v := range collectSquigglyBeGone(opts) { out[k] = v }
+	for k, v := range collectSquigglyBeGone(opts) {
+		out[k] = v
+	}
 	return out
 }

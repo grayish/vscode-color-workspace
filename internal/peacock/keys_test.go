@@ -18,15 +18,23 @@ func TestColorKeys_Contains(t *testing.T) {
 		"commandCenter.border", "editorError.foreground",
 	}
 	for _, k := range must {
-		if !set[k] { t.Errorf("ColorKeysSet missing %q", k) }
+		if !set[k] {
+			t.Errorf("ColorKeysSet missing %q", k)
+		}
 	}
 }
 
 func TestHasPeacockPrefix(t *testing.T) {
-	if !HasPeacockPrefix("peacock.color") { t.Error("peacock.color should match") }
-	if HasPeacockPrefix("workbench.colorCustomizations") { t.Error("workbench.* should not match") }
+	if !HasPeacockPrefix("peacock.color") {
+		t.Error("peacock.color should match")
+	}
+	if HasPeacockPrefix("workbench.colorCustomizations") {
+		t.Error("workbench.* should not match")
+	}
 }
 
 func TestSettingColor(t *testing.T) {
-	if SettingColor != "peacock.color" { t.Errorf("SettingColor = %q", SettingColor) }
+	if SettingColor != "peacock.color" {
+		t.Errorf("SettingColor = %q", SettingColor)
+	}
 }

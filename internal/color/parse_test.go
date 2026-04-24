@@ -16,13 +16,20 @@ func TestParse_Hex(t *testing.T) {
 	}
 	for _, tt := range tests {
 		got, err := Parse(tt.in)
-		if err != nil { t.Fatalf("Parse(%q) error: %v", tt.in, err) }
-		if got != tt.want { t.Errorf("Parse(%q) = %v, want %v", tt.in, got, tt.want) }
+		if err != nil {
+			t.Fatalf("Parse(%q) error: %v", tt.in, err)
+		}
+		if got != tt.want {
+			t.Errorf("Parse(%q) = %v, want %v", tt.in, got, tt.want)
+		}
 	}
 }
 
 func TestParse_Named(t *testing.T) {
-	tests := []struct { in string; want Color }{
+	tests := []struct {
+		in   string
+		want Color
+	}{
 		{"red", Color{255, 0, 0}},
 		{"Red", Color{255, 0, 0}},
 		{"white", Color{255, 255, 255}},
@@ -32,14 +39,20 @@ func TestParse_Named(t *testing.T) {
 	}
 	for _, tt := range tests {
 		got, err := Parse(tt.in)
-		if err != nil { t.Fatalf("Parse(%q) error: %v", tt.in, err) }
-		if got != tt.want { t.Errorf("Parse(%q) = %v, want %v", tt.in, got, tt.want) }
+		if err != nil {
+			t.Fatalf("Parse(%q) error: %v", tt.in, err)
+		}
+		if got != tt.want {
+			t.Errorf("Parse(%q) = %v, want %v", tt.in, got, tt.want)
+		}
 	}
 }
 
 func TestParse_Random(t *testing.T) {
 	c, err := Parse("random")
-	if err != nil { t.Fatalf("Parse(\"random\") error: %v", err) }
+	if err != nil {
+		t.Fatalf("Parse(\"random\") error: %v", err)
+	}
 	_ = c
 }
 

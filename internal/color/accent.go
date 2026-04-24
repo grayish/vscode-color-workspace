@@ -42,7 +42,7 @@ func ReadableAccent(base Color, ratio float64) Color {
 	}
 
 	type shade struct {
-		c       Color
+		c        Color
 		contrast float64
 	}
 	const shadeCount = 16
