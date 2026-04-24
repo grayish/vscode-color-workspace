@@ -110,3 +110,33 @@ func TestCollectActivityBar_Disabled(t *testing.T) {
 	out := collectActivityBar(Color{90, 59, 140}, opts)
 	if len(out) != 0 { t.Errorf("disabled -> %d keys, want 0", len(out)) }
 }
+
+func TestCollectStatusBar_Defaults(t *testing.T) {
+	opts := DefaultOptions()
+	out := collectStatusBar(Color{90, 59, 140}, opts)
+	must := []string{
+		"statusBar.background", "statusBarItem.hoverBackground",
+		"statusBarItem.remoteBackground", "statusBar.foreground",
+		"statusBarItem.remoteForeground",
+	}
+	for _, k := range must {
+		if _, ok := out[k]; !ok { t.Errorf("missing %q", k) }
+	}
+}
+
+func TestCollectStatusBar_Debugging(t *testing.T) {
+	opts := DefaultOptions()
+	opts.Affect.DebuggingStatusBar = true
+	out := collectStatusBar(Color{90, 59, 140}, opts)
+	if _, ok := out["statusBar.debuggingBackground"]; !ok { t.Error("expected debuggingBackground") }
+	if _, ok := out["statusBar.debuggingForeground"]; !ok { t.Error("expected debuggingForeground") }
+}
+
+func TestCollectStatusBar_BordersWithDebug(t *testing.T) {
+	opts := DefaultOptions()
+	opts.Affect.DebuggingStatusBar = true
+	opts.Affect.StatusAndTitleBorders = true
+	out := collectStatusBar(Color{90, 59, 140}, opts)
+	if _, ok := out["statusBar.border"]; !ok { t.Error("expected statusBar.border") }
+	if _, ok := out["statusBar.debuggingBorder"]; !ok { t.Error("expected statusBar.debuggingBorder") }
+}

@@ -84,6 +84,34 @@ func foregroundFor(bg Color, opts Options) Color {
 	return c
 }
 
+func collectStatusBar(base Color, opts Options) map[string]string {
+	out := map[string]string{}
+	if !opts.Affect.StatusBar { return out }
+	style := elementStyle(base, opts)
+	out["statusBar.background"] = style.Background.Hex()
+	out["statusBarItem.hoverBackground"] = style.BackgroundHover.Hex()
+	out["statusBarItem.remoteBackground"] = style.Background.Hex()
+
+	if opts.Affect.StatusAndTitleBorders {
+		out["statusBar.border"] = style.Background.Hex()
+	}
+	if !opts.Standard.KeepForegroundColor {
+		out["statusBar.foreground"] = style.Foreground.Hex()
+		out["statusBarItem.remoteForeground"] = style.Foreground.Hex()
+	}
+	if opts.Affect.DebuggingStatusBar {
+		debugBg := base.Complement()
+		out["statusBar.debuggingBackground"] = debugBg.Hex()
+		if opts.Affect.StatusAndTitleBorders {
+			out["statusBar.debuggingBorder"] = debugBg.Hex()
+		}
+		if !opts.Standard.KeepForegroundColor {
+			out["statusBar.debuggingForeground"] = foregroundFor(debugBg, opts).Hex()
+		}
+	}
+	return out
+}
+
 func collectActivityBar(base Color, opts Options) map[string]string {
 	out := map[string]string{}
 	if !opts.Affect.ActivityBar { return out }
