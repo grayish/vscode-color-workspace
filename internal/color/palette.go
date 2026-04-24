@@ -84,6 +84,23 @@ func foregroundFor(bg Color, opts Options) Color {
 	return c
 }
 
+func collectActivityBar(base Color, opts Options) map[string]string {
+	out := map[string]string{}
+	if !opts.Affect.ActivityBar { return out }
+	style := elementStyle(base, opts)
+	out["activityBar.background"] = style.Background.Hex()
+	out["activityBar.activeBackground"] = style.Background.Hex()
+	if !opts.Standard.KeepForegroundColor {
+		out["activityBar.foreground"] = style.Foreground.Hex()
+		out["activityBar.inactiveForeground"] = style.Foreground.HexWithAlpha(0x99)
+	}
+	if !opts.Standard.KeepBadgeColor {
+		out["activityBarBadge.background"] = style.BadgeBackground.Hex()
+		out["activityBarBadge.foreground"] = style.BadgeForeground.Hex()
+	}
+	return out
+}
+
 // collectTitleBar ports collectTitleBarSettings from Peacock.
 func collectTitleBar(base Color, opts Options) map[string]string {
 	out := map[string]string{}

@@ -78,3 +78,35 @@ func TestCollectTitleBar_WithBorders(t *testing.T) {
 		t.Errorf("titleBar.border = %q, want #5a3b8c", out["titleBar.border"])
 	}
 }
+
+func TestCollectActivityBar_Defaults(t *testing.T) {
+	base := Color{90, 59, 140}
+	opts := DefaultOptions()
+	out := collectActivityBar(base, opts)
+	must := []string{
+		"activityBar.background", "activityBar.activeBackground",
+		"activityBar.foreground", "activityBar.inactiveForeground",
+		"activityBarBadge.background", "activityBarBadge.foreground",
+	}
+	for _, k := range must {
+		if _, ok := out[k]; !ok { t.Errorf("missing %q", k) }
+	}
+	if out["activityBar.background"] != out["activityBar.activeBackground"] {
+		t.Error("background and activeBackground should match")
+	}
+}
+
+func TestCollectActivityBar_KeepBadge(t *testing.T) {
+	opts := DefaultOptions()
+	opts.Standard.KeepBadgeColor = true
+	out := collectActivityBar(Color{90, 59, 140}, opts)
+	if _, ok := out["activityBarBadge.background"]; ok { t.Error("badge should be omitted") }
+	if _, ok := out["activityBarBadge.foreground"]; ok { t.Error("badge fg should be omitted") }
+}
+
+func TestCollectActivityBar_Disabled(t *testing.T) {
+	opts := DefaultOptions()
+	opts.Affect.ActivityBar = false
+	out := collectActivityBar(Color{90, 59, 140}, opts)
+	if len(out) != 0 { t.Errorf("disabled -> %d keys, want 0", len(out)) }
+}
