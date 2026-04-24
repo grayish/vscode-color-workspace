@@ -13,6 +13,15 @@ func TestDefaultOptions(t *testing.T) {
 	if opts.Standard.DarkenLightenPct != 10 {
 		t.Errorf("default pct = %f, want 10", opts.Standard.DarkenLightenPct)
 	}
+	if opts.Adjust.ActivityBar != AdjustLighten {
+		t.Errorf("default ActivityBar adjust = %v, want AdjustLighten", opts.Adjust.ActivityBar)
+	}
+	if opts.Adjust.StatusBar != AdjustNone {
+		t.Errorf("default StatusBar adjust = %v, want AdjustNone", opts.Adjust.StatusBar)
+	}
+	if opts.Adjust.TitleBar != AdjustDarken {
+		t.Errorf("default TitleBar adjust = %v, want AdjustDarken", opts.Adjust.TitleBar)
+	}
 }
 
 func TestElementStyle_Derivatives(t *testing.T) {
@@ -30,6 +39,7 @@ func TestElementStyle_Derivatives(t *testing.T) {
 func TestCollectTitleBar_Defaults(t *testing.T) {
 	base := Color{90, 59, 140}
 	opts := DefaultOptions()
+	opts.Adjust = AdjustOptions{} // isolate from default titleBar darken
 	out := collectTitleBar(base, opts)
 	must := []string{
 		"titleBar.activeBackground", "titleBar.inactiveBackground",
@@ -78,6 +88,7 @@ func TestCollectTitleBar_KeepForeground(t *testing.T) {
 func TestCollectTitleBar_WithBorders(t *testing.T) {
 	base := Color{90, 59, 140}
 	opts := DefaultOptions()
+	opts.Adjust = AdjustOptions{} // isolate from default titleBar darken
 	opts.Affect.StatusAndTitleBorders = true
 	out := collectTitleBar(base, opts)
 	if out["titleBar.border"] != "#5a3b8c" {
@@ -167,6 +178,7 @@ func TestCollectStatusBar_BordersWithDebug(t *testing.T) {
 
 func TestCollectAccentBorder(t *testing.T) {
 	opts := DefaultOptions()
+	opts.Adjust = AdjustOptions{} // isolate from default activityBar lighten
 	opts.Affect.EditorGroupBorder = true
 	opts.Affect.PanelBorder = true
 	opts.Affect.TabActiveBorder = true

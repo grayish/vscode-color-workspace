@@ -48,13 +48,22 @@ type Options struct {
 	Standard StandardOptions
 }
 
-// DefaultOptions mirrors Peacock's defaults.
+// DefaultOptions mirrors Peacock's defaults for Affect/Standard, but
+// deliberately diverges on Adjust: we lighten the activityBar and darken
+// the titleBar so the three bars are visually distinct out of the box.
+// Peacock's default is no adjustment (all three share base color); that
+// was surprising for users. Override via `ccws interactive`.
 func DefaultOptions() Options {
 	return Options{
 		Affect: AffectOptions{
 			ActivityBar: true,
 			StatusBar:   true,
 			TitleBar:    true,
+		},
+		Adjust: AdjustOptions{
+			ActivityBar: AdjustLighten,
+			StatusBar:   AdjustNone,
+			TitleBar:    AdjustDarken,
 		},
 		Standard: StandardOptions{
 			DarkenLightenPct:   10,
