@@ -167,3 +167,16 @@ func collectSquigglyBeGone(opts Options) map[string]string {
 	out["editorInfo.foreground"] = transparent
 	return out
 }
+
+// Palette builds the workbench.colorCustomizations map for a base color.
+// Only emits keys for enabled affected elements.
+func Palette(base Color, opts Options) map[string]string {
+	out := map[string]string{}
+	for _, f := range []func(Color, Options) map[string]string{
+		collectTitleBar, collectActivityBar, collectStatusBar, collectAccentBorder,
+	} {
+		for k, v := range f(base, opts) { out[k] = v }
+	}
+	for k, v := range collectSquigglyBeGone(opts) { out[k] = v }
+	return out
+}

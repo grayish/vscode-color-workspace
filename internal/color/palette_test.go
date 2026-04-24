@@ -168,3 +168,31 @@ func TestCollectSquigglyBeGone_On(t *testing.T) {
 		if out[k] != "#00000000" { t.Errorf("%s = %q, want #00000000", k, out[k]) }
 	}
 }
+
+func TestPalette_DefaultsContainExpected(t *testing.T) {
+	base := Color{90, 59, 140}
+	out := Palette(base, DefaultOptions())
+	for _, k := range []string{
+		"activityBar.background", "statusBar.background", "titleBar.activeBackground",
+	} {
+		if _, ok := out[k]; !ok { t.Errorf("missing %q", k) }
+	}
+	if _, ok := out["editorGroup.border"]; ok { t.Error("editorGroup.border should be absent") }
+}
+
+func TestPalette_AllOn(t *testing.T) {
+	base := Color{90, 59, 140}
+	opts := DefaultOptions()
+	opts.Affect.EditorGroupBorder = true
+	opts.Affect.PanelBorder = true
+	opts.Affect.SideBarBorder = true
+	opts.Affect.SashHover = true
+	opts.Affect.StatusAndTitleBorders = true
+	opts.Affect.DebuggingStatusBar = true
+	opts.Affect.TabActiveBorder = true
+	opts.Standard.SquigglyBeGone = true
+	out := Palette(base, opts)
+	if len(out) < 25 {
+		t.Errorf("all-on palette has %d keys, want >= 25", len(out))
+	}
+}
