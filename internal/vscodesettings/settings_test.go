@@ -95,3 +95,71 @@ func TestResidualColorKeys_NilSettings(t *testing.T) {
 		t.Errorf("nil -> %v", got)
 	}
 }
+
+func TestCleanup_DeletesPeacockKeys(t *testing.T) {
+	s := &Settings{Raw: map[string]any{
+		"peacock.color":             "#5a3b8c",
+		"peacock.affectActivityBar": true,
+		"editor.tabSize":            2.0,
+		"workbench.colorCustomizations": map[string]any{
+			"activityBar.background": "#5a3b8c",
+			"editor.background":      "#000000",
+		},
+	}}
+	Cleanup(s)
+
+	if _, ok := s.Raw["peacock.color"]; ok {
+		t.Error("peacock.color should be deleted")
+	}
+	if _, ok := s.Raw["peacock.affectActivityBar"]; ok {
+		t.Error("peacock.affectActivityBar should be deleted")
+	}
+	if s.Raw["editor.tabSize"].(float64) != 2 {
+		t.Error("editor.tabSize should be preserved")
+	}
+	cc := s.Raw["workbench.colorCustomizations"].(map[string]any)
+	if _, ok := cc["activityBar.background"]; ok {
+		t.Error("activityBar.background should be deleted")
+	}
+	if cc["editor.background"] != "#000000" {
+		t.Error("editor.background should be preserved")
+	}
+}
+
+func TestCleanup_RemovesEmptyColorCustomizations(t *testing.T) {
+	s := &Settings{Raw: map[string]any{
+		"workbench.colorCustomizations": map[string]any{
+			"activityBar.background": "#5a3b8c",
+		},
+	}}
+	Cleanup(s)
+	if _, ok := s.Raw["workbench.colorCustomizations"]; ok {
+		t.Error("empty colorCustomizations should be removed")
+	}
+}
+
+func TestCleanup_NoSettings(t *testing.T) {
+	if Cleanup(nil) {
+		t.Error("nil should return false")
+	}
+}
+
+func TestCleanup_Empty(t *testing.T) {
+	s := &Settings{Raw: map[string]any{}}
+	if Cleanup(s) {
+		t.Error("empty raw should return false (no change)")
+	}
+}
+
+func TestCleanup_ReportsEmpty(t *testing.T) {
+	s := &Settings{Raw: map[string]any{
+		"peacock.color": "#5a3b8c",
+	}}
+	changed := Cleanup(s)
+	if !changed {
+		t.Error("should report changed")
+	}
+	if !s.IsEmpty() {
+		t.Error("IsEmpty should be true after removing the only key")
+	}
+}
