@@ -146,3 +146,24 @@ func collectTitleBar(base Color, opts Options) map[string]string {
 	}
 	return out
 }
+
+func collectAccentBorder(base Color, opts Options) map[string]string {
+	out := map[string]string{}
+	hex := base.Hex()
+	if opts.Affect.EditorGroupBorder { out["editorGroup.border"] = hex }
+	if opts.Affect.PanelBorder { out["panel.border"] = hex }
+	if opts.Affect.SideBarBorder { out["sideBar.border"] = hex }
+	if opts.Affect.SashHover { out["sash.hoverBorder"] = hex }
+	if opts.Affect.TabActiveBorder { out["tab.activeBorder"] = hex }
+	return out
+}
+
+func collectSquigglyBeGone(opts Options) map[string]string {
+	out := map[string]string{}
+	if !opts.Standard.SquigglyBeGone { return out }
+	const transparent = "#00000000"
+	out["editorError.foreground"] = transparent
+	out["editorWarning.foreground"] = transparent
+	out["editorInfo.foreground"] = transparent
+	return out
+}

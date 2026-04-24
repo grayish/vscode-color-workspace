@@ -140,3 +140,31 @@ func TestCollectStatusBar_BordersWithDebug(t *testing.T) {
 	if _, ok := out["statusBar.border"]; !ok { t.Error("expected statusBar.border") }
 	if _, ok := out["statusBar.debuggingBorder"]; !ok { t.Error("expected statusBar.debuggingBorder") }
 }
+
+func TestCollectAccentBorder(t *testing.T) {
+	opts := DefaultOptions()
+	opts.Affect.EditorGroupBorder = true
+	opts.Affect.PanelBorder = true
+	opts.Affect.TabActiveBorder = true
+	out := collectAccentBorder(Color{90, 59, 140}, opts)
+	want := []string{"editorGroup.border", "panel.border", "tab.activeBorder"}
+	for _, k := range want {
+		if out[k] != "#5a3b8c" { t.Errorf("%s = %q, want #5a3b8c", k, out[k]) }
+	}
+	if _, ok := out["sideBar.border"]; ok { t.Error("sideBar.border should be absent") }
+}
+
+func TestCollectSquigglyBeGone_Off(t *testing.T) {
+	opts := DefaultOptions()
+	out := collectSquigglyBeGone(opts)
+	if len(out) != 0 { t.Errorf("off -> len=%d", len(out)) }
+}
+
+func TestCollectSquigglyBeGone_On(t *testing.T) {
+	opts := DefaultOptions()
+	opts.Standard.SquigglyBeGone = true
+	out := collectSquigglyBeGone(opts)
+	for _, k := range []string{"editorError.foreground", "editorWarning.foreground", "editorInfo.foreground"} {
+		if out[k] != "#00000000" { t.Errorf("%s = %q, want #00000000", k, out[k]) }
+	}
+}
