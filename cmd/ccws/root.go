@@ -63,7 +63,7 @@ Peacock-equivalent color palette, migrates existing peacock settings from
 	}
 
 	cmd.Flags().StringVar(&flagColor, "color", "", "Color: #RRGGBB, #RGB, CSS name, or 'random'")
-	cmd.Flags().BoolVar(&flagNoOpen, "no-open", false, "Do not open with `code` after creating")
+	cmd.Flags().BoolVar(&flagNoOpen, "no-open", false, "Do not open with the code CLI after creating")
 	cmd.Flags().BoolVar(&flagForce, "force", false, "Bypass safety guards")
 
 	cmd.AddCommand(interactiveCmd())
