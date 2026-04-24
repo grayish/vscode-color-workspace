@@ -163,3 +163,70 @@ func TestCleanup_ReportsEmpty(t *testing.T) {
 		t.Error("IsEmpty should be true after removing the only key")
 	}
 }
+
+func TestWriteOrDelete_Delete(t *testing.T) {
+	dir := t.TempDir()
+	vdir := filepath.Join(dir, ".vscode")
+	if err := os.Mkdir(vdir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(vdir, "settings.json")
+	if err := os.WriteFile(path, []byte("{}"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	s := &Settings{Path: path, Raw: map[string]any{}}
+	if err := WriteOrDelete(s); err != nil {
+		t.Fatalf("err = %v", err)
+	}
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Error("settings.json should be deleted")
+	}
+	if _, err := os.Stat(vdir); !os.IsNotExist(err) {
+		t.Error(".vscode should be deleted (empty)")
+	}
+}
+
+func TestWriteOrDelete_WriteNonEmpty(t *testing.T) {
+	dir := t.TempDir()
+	vdir := filepath.Join(dir, ".vscode")
+	if err := os.Mkdir(vdir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(vdir, "settings.json")
+	s := &Settings{Path: path, Raw: map[string]any{"editor.tabSize": 2.0}}
+	if err := WriteOrDelete(s); err != nil {
+		t.Fatalf("err = %v", err)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read back: %v", err)
+	}
+	if len(data) == 0 {
+		t.Error("file should not be empty")
+	}
+}
+
+func TestWriteOrDelete_KeepsNonEmptyVSCodeDir(t *testing.T) {
+	dir := t.TempDir()
+	vdir := filepath.Join(dir, ".vscode")
+	if err := os.Mkdir(vdir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(vdir, "launch.json"), []byte("{}"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(vdir, "settings.json")
+	if err := os.WriteFile(path, []byte("{}"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	s := &Settings{Path: path, Raw: map[string]any{}}
+	if err := WriteOrDelete(s); err != nil {
+		t.Fatalf("err = %v", err)
+	}
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Error("settings.json should be deleted")
+	}
+	if _, err := os.Stat(vdir); err != nil {
+		t.Error(".vscode should NOT be deleted (still has launch.json)")
+	}
+}
