@@ -63,3 +63,35 @@ func TestPeacockColor_Missing(t *testing.T) {
 		t.Error("should not be present")
 	}
 }
+
+func TestResidualColorKeys_None(t *testing.T) {
+	s := &Settings{Raw: map[string]any{
+		"peacock.color": "#5a3b8c",
+		"workbench.colorCustomizations": map[string]any{
+			"activityBar.background": "#5a3b8c",
+		},
+	}}
+	if got := ResidualColorKeys(s); len(got) != 0 {
+		t.Errorf("got %v, want empty", got)
+	}
+}
+
+func TestResidualColorKeys_HasNonPeacock(t *testing.T) {
+	s := &Settings{Raw: map[string]any{
+		"workbench.colorCustomizations": map[string]any{
+			"activityBar.background": "#5a3b8c",
+			"editor.background":      "#000000",
+			"terminal.background":    "#111111",
+		},
+	}}
+	got := ResidualColorKeys(s)
+	if len(got) != 2 {
+		t.Errorf("got %v, want 2 entries", got)
+	}
+}
+
+func TestResidualColorKeys_NilSettings(t *testing.T) {
+	if got := ResidualColorKeys(nil); len(got) != 0 {
+		t.Errorf("nil -> %v", got)
+	}
+}
