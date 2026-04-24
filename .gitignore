@@ -3,3 +3,4 @@
 *.test
 *.out
 .DS_Store
+/scripts/gen-peacock-fixture/node_modules/

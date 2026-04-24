@@ -1,0 +1,9 @@
+{
+  "name": "gen-peacock-fixture",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Regenerate internal/color/testdata/fixture.json from Peacock's color algorithm (via tinycolor2).",
+  "dependencies": {
+    "tinycolor2": "^1.6.0"
+  }
+}
