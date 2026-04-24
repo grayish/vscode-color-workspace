@@ -70,3 +70,27 @@ func clamp01(v float64) float64 {
 	}
 	return v
 }
+
+// Triad returns three colors 120° apart in hue.
+func (c Color) Triad() [3]Color {
+	h, s, l := c.ToHSL()
+	return [3]Color{c, FromHSL(h+120, s, l), FromHSL(h+240, s, l)}
+}
+
+// Complement shifts hue 180°.
+func (c Color) Complement() Color {
+	h, s, l := c.ToHSL()
+	return FromHSL(h+180, s, l)
+}
+
+// Lighten shifts L up by pct (0-100 scale).
+func (c Color) Lighten(pct float64) Color {
+	h, s, l := c.ToHSL()
+	return FromHSL(h, s, l+pct/100)
+}
+
+// Darken shifts L down by pct.
+func (c Color) Darken(pct float64) Color {
+	h, s, l := c.ToHSL()
+	return FromHSL(h, s, l-pct/100)
+}
