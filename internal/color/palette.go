@@ -62,7 +62,7 @@ func elementStyle(base Color, opts Options) elementStyleT {
 	badgeFg := foregroundFor(badgeBg, opts)
 	return elementStyleT{
 		Background:         base,
-		BackgroundHover:    HoverOf(base),
+		BackgroundHover:    hoverOfAmount(base, hoverPct(opts)),
 		Inactive:           base,
 		Foreground:         fg,
 		InactiveForeground: fg,
@@ -82,6 +82,13 @@ func foregroundFor(bg Color, opts Options) Color {
 	}
 	c, _ := parseHex(hex)
 	return c
+}
+
+func hoverPct(opts Options) float64 {
+	if opts.Standard.DarkenLightenPct > 0 {
+		return opts.Standard.DarkenLightenPct
+	}
+	return DefaultLightenDarkenAmount
 }
 
 func collectStatusBar(base Color, opts Options) map[string]string {

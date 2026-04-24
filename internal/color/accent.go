@@ -15,12 +15,17 @@ const (
 	RatioText  = 4.5
 )
 
-// HoverOf returns the hover variant: darken if base is light, lighten otherwise.
+// HoverOf returns the hover variant with the default 10% amount.
 func HoverOf(base Color) Color {
+	return hoverOfAmount(base, DefaultLightenDarkenAmount)
+}
+
+// hoverOfAmount returns the hover variant using a caller-specified percent.
+func hoverOfAmount(base Color, pct float64) Color {
 	if base.IsLight() {
-		return base.Darken(DefaultLightenDarkenAmount)
+		return base.Darken(pct)
 	}
-	return base.Lighten(DefaultLightenDarkenAmount)
+	return base.Lighten(pct)
 }
 
 // ReadableAccent returns an accent color with contrast >= ratio against base.
