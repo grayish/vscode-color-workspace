@@ -25,7 +25,11 @@ Color algorithm was ported from `/Users/user/Projects/vscode-peacock/` (read-onl
 - `src/configuration/read-configuration.ts` — `prepareColors`, `collect*Settings`
 - `src/models/enums.ts` — `ColorSettings` enum (29 keys — not 28, spec has a typo)
 
-Parity is enforced by `internal/color/golden_test.go` against 5 base colors (fixture at `internal/color/testdata/fixture.json`, generated from `scripts/gen-peacock-fixture/main.js`).
+Parity is enforced by `internal/color/golden_test.go` against 6 fixtures (5 plain bases + 1 with element adjustments) at `internal/color/testdata/fixture.json`, generated from `scripts/gen-peacock-fixture/main.js`. When modifying palette logic, update both the Go code AND the Node generator, then `task fixture` — otherwise fixtures diverge.
+
+## Test isolation — `DefaultOptions()` now carries non-zero Adjust
+
+`DefaultOptions()` returns `Adjust: {ActivityBar: Lighten, TitleBar: Darken, StatusBar: None}` so bars differ by default. Tests that assert a bar or accent border equals the base color must explicitly reset: `opts.Adjust = AdjustOptions{}`. Forgetting this is how `TestCollectTitleBar_Defaults` / `TestCollectAccentBorder` can mysteriously regress.
 
 ## Safety guards (project-specific terminology)
 
