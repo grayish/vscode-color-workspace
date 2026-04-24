@@ -83,3 +83,21 @@ func foregroundFor(bg Color, opts Options) Color {
 	c, _ := parseHex(hex)
 	return c
 }
+
+// collectTitleBar ports collectTitleBarSettings from Peacock.
+func collectTitleBar(base Color, opts Options) map[string]string {
+	out := map[string]string{}
+	if !opts.Affect.TitleBar { return out }
+	style := elementStyle(base, opts)
+	out["titleBar.activeBackground"] = style.Background.Hex()
+	if opts.Affect.StatusAndTitleBorders {
+		out["titleBar.border"] = style.Background.Hex()
+	}
+	out["titleBar.inactiveBackground"] = style.Background.HexWithAlpha(0x99)
+	if !opts.Standard.KeepForegroundColor {
+		out["titleBar.activeForeground"] = style.Foreground.Hex()
+		out["titleBar.inactiveForeground"] = style.Foreground.HexWithAlpha(0x99)
+		out["commandCenter.border"] = style.Foreground.HexWithAlpha(0x99)
+	}
+	return out
+}
