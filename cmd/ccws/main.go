@@ -1,8 +1,9 @@
 package main
 
 import (
-	"fmt"
 	"os"
+
+	"github.com/sang-bin/vscode-color-workspace/internal/tui"
 )
 
 func main() {
@@ -10,7 +11,7 @@ func main() {
 	cmd.SilenceErrors = true
 	cmd.SilenceUsage = true
 	if err := cmd.Execute(); err != nil {
-		fmt.Fprintln(os.Stderr, err)
+		renderError(tui.NewStderr(), err)
 		os.Exit(errToExit(err))
 	}
 }
