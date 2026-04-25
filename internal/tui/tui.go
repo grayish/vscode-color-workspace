@@ -15,31 +15,25 @@ import (
 // Writer renders styled CLI output to an io.Writer.
 // Color rendering is enabled per-instance (see NewStdout/NewStderr/NewWriter).
 type Writer struct {
-	out    io.Writer
-	color  bool
-	styles badgeStyles
+	out   io.Writer
+	color bool
 }
 
 // NewWriter returns a Writer over out. color enables lipgloss styling; pass
 // false for tests, plain logs, or non-TTY output.
 func NewWriter(out io.Writer, color bool) *Writer {
-	w := &Writer{out: out, color: color}
-	if color {
-		r := lipgloss.NewRenderer(out, termenv.WithProfile(termenv.ANSI), termenv.WithTTY(true))
-		w.styles = newBadgeStyles(r)
-	}
-	return w
+	return &Writer{out: out, color: color}
 }
 
 // NewStdout returns a Writer over os.Stdout, with color enabled when stdout is
 // a TTY, NO_COLOR is unset, and TERM != "dumb".
 func NewStdout() *Writer {
-	return NewWriter(os.Stdout, shouldColor(os.Stdout.Fd()))
+	return &Writer{out: os.Stdout, color: shouldColor(os.Stdout.Fd())}
 }
 
 // NewStderr is NewStdout for os.Stderr.
 func NewStderr() *Writer {
-	return NewWriter(os.Stderr, shouldColor(os.Stderr.Fd()))
+	return &Writer{out: os.Stderr, color: shouldColor(os.Stderr.Fd())}
 }
 
 func shouldColor(fd uintptr) bool {
@@ -62,34 +56,31 @@ const (
 // Width = leadingIndent + badgeWidth + badgeSeparator = 2+5+2 = 9.
 var continuationIndent = strings.Repeat(" ", len(leadingIndent)+badgeWidth+len(badgeSeparator))
 
-// badgeStyles holds pre-built lipgloss styles for a given Renderer.
-type badgeStyles struct {
-	ok    lipgloss.Style
-	warn  lipgloss.Style
-	error lipgloss.Style
-}
+// renderer forces lipgloss to emit ANSI escapes regardless of where the
+// resulting string is eventually written (e.g. a *bytes.Buffer in tests).
+// Style.Render(s) string does not actually write to renderer.Writer; the
+// io.Discard target is purely a placeholder.
+var renderer = lipgloss.NewRenderer(io.Discard, termenv.WithProfile(termenv.ANSI), termenv.WithTTY(true))
 
-// newBadgeStyles creates badge styles bound to r so ANSI output is emitted
-// regardless of whether the underlying writer is a TTY.
-func newBadgeStyles(r *lipgloss.Renderer) badgeStyles {
-	return badgeStyles{
-		ok: r.NewStyle().
-			Background(lipgloss.Color("10")).
-			Foreground(lipgloss.Color("0")).
-			Bold(true).
-			Width(badgeWidth),
-		warn: r.NewStyle().
+var (
+	styleOK = renderer.NewStyle().
+		Background(lipgloss.Color("10")).
+		Foreground(lipgloss.Color("0")).
+		Bold(true).
+		Width(badgeWidth)
+
+	styleWarn = renderer.NewStyle().
 			Background(lipgloss.Color("11")).
 			Foreground(lipgloss.Color("0")).
 			Bold(true).
-			Width(badgeWidth),
-		error: r.NewStyle().
+			Width(badgeWidth)
+
+	styleError = renderer.NewStyle().
 			Background(lipgloss.Color("9")).
 			Foreground(lipgloss.Color("15")).
 			Bold(true).
-			Width(badgeWidth),
-	}
-}
+			Width(badgeWidth)
+)
 
 // OK writes a green "ok" badge line.
 func (w *Writer) OK(title string) { w.badge("ok", title) }
@@ -112,11 +103,11 @@ func (w *Writer) renderBadge(label string) string {
 	}
 	switch label {
 	case "ok":
-		return w.styles.ok.Render(label)
+		return styleOK.Render(label)
 	case "warn":
-		return w.styles.warn.Render(label)
+		return styleWarn.Render(label)
 	case "error":
-		return w.styles.error.Render(label)
+		return styleError.Render(label)
 	default:
 		return label + strings.Repeat(" ", max(0, badgeWidth-len(label)))
 	}
