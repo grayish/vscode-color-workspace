@@ -147,16 +147,18 @@ func (w *Writer) Bullets(items []string, limit int) {
 	}
 }
 
-// ShortenPath replaces a leading $HOME with "~". If HOME is unset or p does
-// not begin with $HOME (treating $HOME as a directory boundary), p is returned
-// unchanged. Examples (HOME=/Users/x):
+// ShortenPath replaces a leading $HOME with "~". Trailing slashes on $HOME are
+// trimmed before comparison, so HOME=/Users/x and HOME=/Users/x/ behave the
+// same. If HOME is unset (or trims to empty, e.g. HOME=/) or p does not begin
+// with $HOME (treating $HOME as a directory boundary), p is returned unchanged.
+// Examples (HOME=/Users/x):
 //
 //	"/Users/x"      → "~"
 //	"/Users/x/p"    → "~/p"
 //	"/Users/xy/p"   → "/Users/xy/p"  (sibling, not a child of HOME)
 //	"/tmp/p"        → "/tmp/p"
 func ShortenPath(p string) string {
-	home := os.Getenv("HOME")
+	home := strings.TrimRight(os.Getenv("HOME"), "/")
 	if home == "" {
 		return p
 	}

@@ -15,6 +15,15 @@ func TestNewWriter_NoColor(t *testing.T) {
 	}
 }
 
+func TestNewline(t *testing.T) {
+	var buf bytes.Buffer
+	w := NewWriter(&buf, false)
+	w.Newline()
+	if got := buf.String(); got != "\n" {
+		t.Errorf("Newline() = %q, want %q", got, "\n")
+	}
+}
+
 func TestOK_NoColor(t *testing.T) {
 	var buf bytes.Buffer
 	w := NewWriter(&buf, false)
@@ -183,6 +192,8 @@ func TestShortenPath(t *testing.T) {
 		{"non-prefix unchanged", "/Users/x", "/tmp/p", "/tmp/p"},
 		{"sibling not replaced", "/Users/x", "/Users/xy/p", "/Users/xy/p"},
 		{"home unset", "", "/tmp/p", "/tmp/p"},
+		{"trailing slash home", "/Users/x/", "/Users/x/p", "~/p"},
+		{"home is root unchanged", "/", "/etc", "/etc"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
