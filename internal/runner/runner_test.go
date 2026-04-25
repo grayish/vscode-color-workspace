@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -101,6 +102,17 @@ func TestRun_Guard1_Triggers(t *testing.T) {
 	if gerr.Guard != 1 {
 		t.Errorf("guard = %d, want 1", gerr.Guard)
 	}
+	wantPath := filepath.Join(tmp, "myproj.code-workspace")
+	if gerr.Path != wantPath {
+		t.Errorf("Path = %q, want %q", gerr.Path, wantPath)
+	}
+	if len(gerr.Keys) == 0 {
+		t.Error("Keys should be non-empty")
+	}
+	// Error() must be a single line — used by %v / log fallback.
+	if msg := gerr.Error(); msg == "" || strings.Contains(msg, "\n") {
+		t.Errorf("Error() = %q, want non-empty single line", msg)
+	}
 }
 
 func TestRun_Force_BypassesGuard1(t *testing.T) {
@@ -152,6 +164,17 @@ func TestRun_Guard2_Triggers(t *testing.T) {
 	}
 	if gerr.Guard != 2 {
 		t.Errorf("guard = %d, want 2", gerr.Guard)
+	}
+	wantPath := filepath.Join(target, ".vscode", "settings.json")
+	if gerr.Path != wantPath {
+		t.Errorf("Path = %q, want %q", gerr.Path, wantPath)
+	}
+	if len(gerr.Keys) == 0 {
+		t.Error("Keys should be non-empty")
+	}
+	// Error() must be a single line — used by %v / log fallback.
+	if msg := gerr.Error(); msg == "" || strings.Contains(msg, "\n") {
+		t.Errorf("Error() = %q, want non-empty single line", msg)
 	}
 }
 

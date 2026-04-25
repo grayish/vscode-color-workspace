@@ -6,7 +6,6 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/sang-bin/vscode-color-workspace/internal/color"
 	"github.com/sang-bin/vscode-color-workspace/internal/vscodesettings"
@@ -14,14 +13,17 @@ import (
 )
 
 // GuardError indicates a safety guard triggered. Exit code 2.
+// Carries data only; presentation is the CLI layer's responsibility.
 type GuardError struct {
-	Guard   int
-	Message string
-	Keys    []string
+	Guard int
+	Path  string   // workspace file (Guard 1) or settings.json (Guard 2)
+	Keys  []string // conflicting / residual keys
 }
 
+// Error returns a single-line summary used by %v, log lines, and errors.As
+// fallbacks. The full multi-line presentation is rendered by cmd/ccws.
 func (e *GuardError) Error() string {
-	return e.Message
+	return fmt.Sprintf("guard %d: %d conflicting keys in %s", e.Guard, len(e.Keys), e.Path)
 }
 
 // Result is the output of a successful Run.
@@ -78,13 +80,7 @@ func (r *Runner) Run(opts Options) (*Result, error) {
 	}
 	if ws != nil && !opts.Force {
 		if keys := workspace.ExistingPeacockKeys(ws); len(keys) > 0 {
-			return nil, &GuardError{
-				Guard: 1,
-				Keys:  keys,
-				Message: fmt.Sprintf(
-					"existing peacock color settings in %s: %s\nrerun with --force to overwrite",
-					wsPath, strings.Join(keys, ", ")),
-			}
+			return nil, &GuardError{Guard: 1, Path: wsPath, Keys: keys}
 		}
 	}
 
@@ -96,13 +92,7 @@ func (r *Runner) Run(opts Options) (*Result, error) {
 	willClean := !opts.KeepSource && srcSettings != nil
 	if willClean && !opts.Force {
 		if keys := vscodesettings.ResidualColorKeys(srcSettings); len(keys) > 0 {
-			return nil, &GuardError{
-				Guard: 2,
-				Keys:  keys,
-				Message: fmt.Sprintf(
-					"non-peacock workbench.colorCustomizations would remain in %s: %s\nremove those keys manually or rerun with --force",
-					settingsPath, strings.Join(keys, ", ")),
-			}
+			return nil, &GuardError{Guard: 2, Path: settingsPath, Keys: keys}
 		}
 	}
 

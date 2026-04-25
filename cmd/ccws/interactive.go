@@ -72,7 +72,7 @@ func runInteractive(args []string) error {
 
 func confirmGuard(ge *runner.GuardError) (bool, error) {
 	title := fmt.Sprintf("Guard %d triggered", ge.Guard)
-	desc := ge.Message + "\n\nKeys:\n  " + strings.Join(ge.Keys, "\n  ")
+	desc := ge.Error() + "\n\nKeys:\n  " + strings.Join(ge.Keys, "\n  ")
 	var proceed bool
 	err := huh.NewConfirm().
 		Title(title).
