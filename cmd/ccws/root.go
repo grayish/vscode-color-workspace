@@ -2,12 +2,12 @@ package main
 
 import (
 	"errors"
-	"fmt"
 	"os"
 
 	"github.com/spf13/cobra"
 
 	"github.com/sang-bin/vscode-color-workspace/internal/runner"
+	"github.com/sang-bin/vscode-color-workspace/internal/tui"
 )
 
 // errToExit maps error types to exit codes (§11 of spec).
@@ -53,11 +53,8 @@ Peacock-equivalent color palette, migrates existing peacock settings from
 			if err != nil {
 				return err
 			}
-			fmt.Printf("wrote %s\n", res.WorkspaceFile)
-			fmt.Printf("color: %s (%s)\n", res.ColorHex, sourceLabel(res.ColorSource))
-			for _, w := range res.Warnings {
-				fmt.Fprintln(os.Stderr, "warning: "+w)
-			}
+			renderSuccess(tui.NewStdout(), res, sourceLabel(res.ColorSource))
+			renderWarnings(tui.NewStderr(), res.Warnings)
 			return nil
 		},
 	}
