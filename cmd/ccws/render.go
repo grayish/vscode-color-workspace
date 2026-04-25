@@ -11,39 +11,32 @@ import (
 
 const maxBulletsShown = 8
 
-// renderError dispatches by error type. Called from main.go for the top-level
-// error and from interactive.go for non-recoverable errors.
+// renderError dispatches by error type.
 func renderError(w *tui.Writer, err error) {
 	var ge *runner.GuardError
 	if errors.As(err, &ge) {
-		renderGuard(w, ge)
+		w.Error(guardTitle(ge))
+		writeGuardBody(w, ge)
 		return
 	}
 	w.Error(err.Error())
 }
 
-// renderGuard composes badge + details + bullets + hint for a *GuardError.
-func renderGuard(w *tui.Writer, ge *runner.GuardError) {
-	w.Error(guardTitle(ge))
-	w.Details([]tui.Detail{{Label: "file", Value: tui.ShortenPath(ge.Path)}})
-	w.Details([]tui.Detail{{Label: "keys"}}) // header for the bullet list
-	w.Bullets(ge.Keys, maxBulletsShown)
-	w.Details([]tui.Detail{{Label: "hint", Value: guardHint(ge)}})
-}
-
-// guardDescription returns the same body content as renderGuard but as plain
-// text (no badge, no ANSI). Used by the huh confirm dialog in interactive
-// mode, where huh draws its own border.
+// guardDescription returns the guard body as plain text. The huh confirm
+// dialog draws its own border, so no badge or ANSI.
 func guardDescription(ge *runner.GuardError) string {
 	var buf bytes.Buffer
-	w := tui.NewWriter(&buf, false)
+	writeGuardBody(tui.NewWriter(&buf, false), ge)
+	return buf.String()
+}
+
+func writeGuardBody(w *tui.Writer, ge *runner.GuardError) {
 	w.Details([]tui.Detail{
 		{Label: "file", Value: tui.ShortenPath(ge.Path)},
 		{Label: "keys"},
 	})
 	w.Bullets(ge.Keys, maxBulletsShown)
 	w.Details([]tui.Detail{{Label: "hint", Value: guardHint(ge)}})
-	return buf.String()
 }
 
 func guardTitle(ge *runner.GuardError) string {
@@ -64,9 +57,8 @@ func guardHint(ge *runner.GuardError) string {
 	return "rerun with --force to overwrite"
 }
 
-// renderSuccess writes the success block: ok badge + file + color rows.
-// Empty srcLabel suppresses the "(...)" suffix on the color row — used by
-// interactive mode where the source is implicit.
+// renderSuccess writes the success block. Empty srcLabel suppresses the
+// "(...)" suffix on the color row.
 func renderSuccess(w *tui.Writer, res *runner.Result, srcLabel string) {
 	w.OK("wrote " + tui.ShortenPath(res.WorkspaceFile))
 	value := res.ColorHex
@@ -76,11 +68,10 @@ func renderSuccess(w *tui.Writer, res *runner.Result, srcLabel string) {
 	w.Details([]tui.Detail{{Label: "color", Value: value}})
 }
 
-// renderWarnings writes one warn block per message, with a blank line between.
 func renderWarnings(w *tui.Writer, warnings []string) {
 	for i, msg := range warnings {
 		if i > 0 {
-			fmt.Fprintln(w.Out())
+			w.Newline()
 		}
 		w.Warn(msg)
 	}

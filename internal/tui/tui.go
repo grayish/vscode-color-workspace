@@ -36,9 +36,8 @@ func NewStderr() *Writer {
 	return &Writer{out: os.Stderr, color: shouldColor(os.Stderr.Fd())}
 }
 
-// Out returns the underlying writer. Used by callers that need to interleave
-// raw output (e.g., blank-line separators) with badge methods.
-func (w *Writer) Out() io.Writer { return w.out }
+// Newline writes a single blank line. Used between adjacent badge blocks.
+func (w *Writer) Newline() { fmt.Fprintln(w.out) }
 
 func shouldColor(fd uintptr) bool {
 	if os.Getenv("NO_COLOR") != "" {
@@ -87,34 +86,25 @@ var (
 )
 
 // OK writes a green "ok" badge line.
-func (w *Writer) OK(title string) { w.badge("ok", title) }
+func (w *Writer) OK(title string) { w.badge(styleOK, "ok", title) }
 
 // Warn writes a yellow "warn" badge line.
-func (w *Writer) Warn(title string) { w.badge("warn", title) }
+func (w *Writer) Warn(title string) { w.badge(styleWarn, "warn", title) }
 
 // Error writes a red "error" badge line.
-func (w *Writer) Error(title string) { w.badge("error", title) }
+func (w *Writer) Error(title string) { w.badge(styleError, "error", title) }
 
-func (w *Writer) badge(label, title string) {
-	cell := w.renderBadge(label)
+func (w *Writer) badge(style lipgloss.Style, label, title string) {
+	cell := w.renderBadge(style, label)
 	fmt.Fprintf(w.out, "%s%s%s%s\n", leadingIndent, cell, badgeSeparator, title)
 }
 
 // renderBadge returns the badge cell, padded to badgeWidth.
-func (w *Writer) renderBadge(label string) string {
+func (w *Writer) renderBadge(style lipgloss.Style, label string) string {
 	if !w.color {
 		return label + strings.Repeat(" ", max(0, badgeWidth-len(label)))
 	}
-	switch label {
-	case "ok":
-		return styleOK.Render(label)
-	case "warn":
-		return styleWarn.Render(label)
-	case "error":
-		return styleError.Render(label)
-	default:
-		return label + strings.Repeat(" ", max(0, badgeWidth-len(label)))
-	}
+	return style.Render(label)
 }
 
 // Detail is one row under a badge. Empty Value renders as a header line
@@ -140,20 +130,20 @@ func (w *Writer) Details(rows []Detail) {
 // bulletIndent is continuation indent + 2 spaces for the bullet glyph.
 var bulletIndent = continuationIndent + "  "
 
-// Bullets writes up to max items as bulleted lines. When len(items) > max,
-// the first max items are written and a final "…(N more)" line is appended.
-// max <= 0 disables truncation.
-func (w *Writer) Bullets(items []string, max int) {
-	truncated := max > 0 && len(items) > max
+// Bullets writes up to limit items as bulleted lines. When len(items) > limit,
+// the first limit items are written and a final "…(N more)" line is appended.
+// limit <= 0 disables truncation.
+func (w *Writer) Bullets(items []string, limit int) {
+	truncated := limit > 0 && len(items) > limit
 	shown := items
 	if truncated {
-		shown = items[:max]
+		shown = items[:limit]
 	}
 	for _, it := range shown {
 		fmt.Fprintf(w.out, "%s• %s\n", bulletIndent, it)
 	}
 	if truncated {
-		fmt.Fprintf(w.out, "%s…(%d more)\n", bulletIndent, len(items)-max)
+		fmt.Fprintf(w.out, "%s…(%d more)\n", bulletIndent, len(items)-limit)
 	}
 }
 

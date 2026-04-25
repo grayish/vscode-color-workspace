@@ -56,7 +56,7 @@ func TestRenderBadge_LongLabelDoesNotPanic(t *testing.T) {
 			t.Fatalf("renderBadge panicked on long label: %v", r)
 		}
 	}()
-	got := w.renderBadge("over-five")
+	got := w.renderBadge(styleOK, "over-five")
 	if got != "over-five" {
 		t.Errorf("renderBadge(over-five) = %q, want %q (no padding when label > badgeWidth)", got, "over-five")
 	}
@@ -108,8 +108,8 @@ func TestBullets_Truncates(t *testing.T) {
 	w.Bullets(items, 8)
 	got := buf.String()
 	var want strings.Builder
-	for i := 0; i < 8; i++ {
-		want.WriteString(fmt.Sprintf("           • k%d\n", i))
+	for i := range 8 {
+		fmt.Fprintf(&want, "           • k%d\n", i)
 	}
 	want.WriteString("           …(9 more)\n")
 	if got != want.String() {

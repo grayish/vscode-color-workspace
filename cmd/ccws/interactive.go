@@ -43,8 +43,6 @@ func runInteractive(args []string) error {
 	for attempt := 0; attempt < 2; attempt++ {
 		res, err := runner.New(nil).Run(opts)
 		if err == nil {
-			// Interactive mode: source is implicit (user just chose it),
-			// pass "" to suppress "(from ...)" suffix.
 			renderSuccess(tui.NewStdout(), res, "")
 			renderWarnings(tui.NewStderr(), res.Warnings)
 			return nil
