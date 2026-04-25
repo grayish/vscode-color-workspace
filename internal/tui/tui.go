@@ -152,3 +152,25 @@ func (w *Writer) Bullets(items []string, max int) {
 		fmt.Fprintf(w.out, "%s…(%d more)\n", bulletIndent, len(items)-max)
 	}
 }
+
+// ShortenPath replaces a leading $HOME with "~". If HOME is unset or p does
+// not begin with $HOME (treating $HOME as a directory boundary), p is returned
+// unchanged. Examples (HOME=/Users/x):
+//
+//	"/Users/x"      → "~"
+//	"/Users/x/p"    → "~/p"
+//	"/Users/xy/p"   → "/Users/xy/p"  (sibling, not a child of HOME)
+//	"/tmp/p"        → "/tmp/p"
+func ShortenPath(p string) string {
+	home := os.Getenv("HOME")
+	if home == "" {
+		return p
+	}
+	if p == home {
+		return "~"
+	}
+	if strings.HasPrefix(p, home+"/") {
+		return "~" + p[len(home):]
+	}
+	return p
+}

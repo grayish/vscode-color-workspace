@@ -170,3 +170,28 @@ func TestNewStdout_HonorsTermDumb(t *testing.T) {
 		t.Error("TERM=dumb should disable color")
 	}
 }
+
+func TestShortenPath(t *testing.T) {
+	tests := []struct {
+		name string
+		home string
+		in   string
+		want string
+	}{
+		{"prefix replaced", "/Users/x", "/Users/x/p", "~/p"},
+		{"exact home", "/Users/x", "/Users/x", "~"},
+		{"non-prefix unchanged", "/Users/x", "/tmp/p", "/tmp/p"},
+		{"sibling not replaced", "/Users/x", "/Users/xy/p", "/Users/xy/p"},
+		{"home unset", "", "/tmp/p", "/tmp/p"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("HOME", tt.home)
+			got := ShortenPath(tt.in)
+			if got != tt.want {
+				t.Errorf("ShortenPath(%q) with HOME=%q = %q, want %q",
+					tt.in, tt.home, got, tt.want)
+			}
+		})
+	}
+}
