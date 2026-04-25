@@ -77,14 +77,15 @@ var bulletIndent = continuationIndent + "  "
 // the first max items are written and a final "…(N more)" line is appended.
 // max <= 0 disables truncation.
 func (w *Writer) Bullets(items []string, max int) {
+	truncated := max > 0 && len(items) > max
 	shown := items
-	if max > 0 && len(items) > max {
+	if truncated {
 		shown = items[:max]
 	}
 	for _, it := range shown {
 		fmt.Fprintf(w.out, "%s• %s\n", bulletIndent, it)
 	}
-	if max > 0 && len(items) > max {
+	if truncated {
 		fmt.Fprintf(w.out, "%s…(%d more)\n", bulletIndent, len(items)-max)
 	}
 }
