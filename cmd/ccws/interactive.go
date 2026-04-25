@@ -3,15 +3,14 @@ package main
 import (
 	"errors"
 	"fmt"
-	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
 
 	"github.com/sang-bin/vscode-color-workspace/internal/interactive"
 	"github.com/sang-bin/vscode-color-workspace/internal/runner"
+	"github.com/sang-bin/vscode-color-workspace/internal/tui"
 )
 
 func interactiveCmd() *cobra.Command {
@@ -44,11 +43,10 @@ func runInteractive(args []string) error {
 	for attempt := 0; attempt < 2; attempt++ {
 		res, err := runner.New(nil).Run(opts)
 		if err == nil {
-			fmt.Printf("wrote %s\n", res.WorkspaceFile)
-			fmt.Printf("color: %s\n", res.ColorHex)
-			for _, w := range res.Warnings {
-				fmt.Fprintln(os.Stderr, "warning: "+w)
-			}
+			// Interactive mode: source is implicit (user just chose it),
+			// pass "" to suppress "(from ...)" suffix.
+			renderSuccess(tui.NewStdout(), res, "")
+			renderWarnings(tui.NewStderr(), res.Warnings)
 			return nil
 		}
 		var ge *runner.GuardError
@@ -72,7 +70,7 @@ func runInteractive(args []string) error {
 
 func confirmGuard(ge *runner.GuardError) (bool, error) {
 	title := fmt.Sprintf("Guard %d triggered", ge.Guard)
-	desc := ge.Error() + "\n\nKeys:\n  " + strings.Join(ge.Keys, "\n  ")
+	desc := guardDescription(ge)
 	var proceed bool
 	err := huh.NewConfirm().
 		Title(title).
