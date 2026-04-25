@@ -140,3 +140,33 @@ func TestBullets_ExactlyAtLimit(t *testing.T) {
 		t.Errorf("expected 8 lines, got %d in %q", lines, got)
 	}
 }
+
+func TestBadge_ColorEmitsANSI(t *testing.T) {
+	var buf bytes.Buffer
+	w := NewWriter(&buf, true)
+	w.Error("boom")
+	got := buf.String()
+	if !strings.Contains(got, "\x1b[") {
+		t.Errorf("color=true output should contain ANSI escape, got %q", got)
+	}
+	if !strings.Contains(got, "boom") {
+		t.Errorf("title text missing from output: %q", got)
+	}
+}
+
+func TestNewStdout_HonorsNoColor(t *testing.T) {
+	t.Setenv("NO_COLOR", "1")
+	w := NewStdout()
+	if w.color {
+		t.Error("NO_COLOR=1 should disable color")
+	}
+}
+
+func TestNewStdout_HonorsTermDumb(t *testing.T) {
+	t.Setenv("NO_COLOR", "")
+	t.Setenv("TERM", "dumb")
+	w := NewStdout()
+	if w.color {
+		t.Error("TERM=dumb should disable color")
+	}
+}
