@@ -49,10 +49,6 @@ func TestError_NoColor(t *testing.T) {
 func TestRenderBadge_LongLabelDoesNotPanic(t *testing.T) {
 	var buf bytes.Buffer
 	w := NewWriter(&buf, false)
-	// Internal call via badge dispatcher would only happen if a future
-	// change uses an unknown label; validate the helper directly via OK
-	// after temporarily forcing a path is awkward — instead, exercise
-	// the helper by calling badge with a long label to ensure max() guard.
 	defer func() {
 		if r := recover(); r != nil {
 			t.Fatalf("renderBadge panicked on long label: %v", r)
