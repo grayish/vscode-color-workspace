@@ -69,3 +69,22 @@ func (w *Writer) Details(rows []Detail) {
 		}
 	}
 }
+
+// bulletIndent is continuation indent + 2 spaces for the bullet glyph.
+var bulletIndent = continuationIndent + "  "
+
+// Bullets writes up to max items as bulleted lines. When len(items) > max,
+// the first max items are written and a final "…(N more)" line is appended.
+// max <= 0 disables truncation.
+func (w *Writer) Bullets(items []string, max int) {
+	shown := items
+	if max > 0 && len(items) > max {
+		shown = items[:max]
+	}
+	for _, it := range shown {
+		fmt.Fprintf(w.out, "%s• %s\n", bulletIndent, it)
+	}
+	if max > 0 && len(items) > max {
+		fmt.Fprintf(w.out, "%s…(%d more)\n", bulletIndent, len(items)-max)
+	}
+}

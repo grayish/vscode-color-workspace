@@ -2,6 +2,8 @@ package tui
 
 import (
 	"bytes"
+	"fmt"
+	"strings"
 	"testing"
 )
 
@@ -82,5 +84,59 @@ func TestDetails_HeaderRow(t *testing.T) {
 	want := "         keys\n"
 	if got != want {
 		t.Errorf("Details header mismatch:\ngot:  %q\nwant: %q", got, want)
+	}
+}
+
+func TestBullets_NoTruncation(t *testing.T) {
+	var buf bytes.Buffer
+	w := NewWriter(&buf, false)
+	w.Bullets([]string{"a", "b", "c"}, 8)
+	got := buf.String()
+	want := "           • a\n           • b\n           • c\n"
+	if got != want {
+		t.Errorf("Bullets mismatch:\ngot:  %q\nwant: %q", got, want)
+	}
+}
+
+func TestBullets_Truncates(t *testing.T) {
+	items := make([]string, 17)
+	for i := range items {
+		items[i] = fmt.Sprintf("k%d", i)
+	}
+	var buf bytes.Buffer
+	w := NewWriter(&buf, false)
+	w.Bullets(items, 8)
+	got := buf.String()
+	var want strings.Builder
+	for i := 0; i < 8; i++ {
+		want.WriteString(fmt.Sprintf("           • k%d\n", i))
+	}
+	want.WriteString("           …(9 more)\n")
+	if got != want.String() {
+		t.Errorf("Bullets truncation mismatch:\ngot:  %q\nwant: %q", got, want.String())
+	}
+}
+
+func TestBullets_Empty(t *testing.T) {
+	var buf bytes.Buffer
+	w := NewWriter(&buf, false)
+	w.Bullets(nil, 8)
+	if buf.Len() != 0 {
+		t.Errorf("Bullets(nil) should produce no output, got %q", buf.String())
+	}
+}
+
+func TestBullets_ExactlyAtLimit(t *testing.T) {
+	items := []string{"a", "b", "c", "d", "e", "f", "g", "h"} // exactly 8
+	var buf bytes.Buffer
+	w := NewWriter(&buf, false)
+	w.Bullets(items, 8)
+	got := buf.String()
+	if strings.Contains(got, "more") {
+		t.Errorf("expected no truncation marker for items==max, got %q", got)
+	}
+	lines := strings.Count(got, "\n")
+	if lines != 8 {
+		t.Errorf("expected 8 lines, got %d in %q", lines, got)
 	}
 }
