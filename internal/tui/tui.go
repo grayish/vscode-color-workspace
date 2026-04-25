@@ -36,6 +36,10 @@ func NewStderr() *Writer {
 	return &Writer{out: os.Stderr, color: shouldColor(os.Stderr.Fd())}
 }
 
+// Out returns the underlying writer. Used by callers that need to interleave
+// raw output (e.g., blank-line separators) with badge methods.
+func (w *Writer) Out() io.Writer { return w.out }
+
 func shouldColor(fd uintptr) bool {
 	if os.Getenv("NO_COLOR") != "" {
 		return false
