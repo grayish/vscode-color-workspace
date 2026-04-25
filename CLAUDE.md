@@ -51,10 +51,11 @@ Strict DAG — no cycles, no backward edges:
 color → (stdlib only)
 peacock → (stdlib only)
 jsonc → hujson
+tui → lipgloss, isatty, termenv
 workspace, vscodesettings → peacock, jsonc
 runner → color, workspace, vscodesettings
 interactive → runner, vscodesettings
-cmd/ccws → runner, interactive
+cmd/ccws → runner, interactive, tui
 ```
 
 ## Non-goals (don't add these without design discussion)
