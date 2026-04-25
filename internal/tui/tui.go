@@ -45,12 +45,7 @@ func (w *Writer) badge(label, title string) {
 }
 
 // renderBadge returns the badge cell, padded to badgeWidth.
-// In no-color mode this is just the left-aligned label; in color mode
-// (added in Task 5) it is wrapped in lipgloss style.
+// Color styling is added in Task 5.
 func (w *Writer) renderBadge(label string) string {
-	if !w.color {
-		return label + strings.Repeat(" ", badgeWidth-len(label))
-	}
-	// color path filled in by Task 5
-	return label + strings.Repeat(" ", badgeWidth-len(label))
+	return label + strings.Repeat(" ", max(0, badgeWidth-len(label)))
 }
