@@ -59,3 +59,28 @@ func TestRenderBadge_LongLabelDoesNotPanic(t *testing.T) {
 		t.Errorf("renderBadge(over-five) = %q, want %q (no padding when label > badgeWidth)", got, "over-five")
 	}
 }
+
+func TestDetails_LabelValue(t *testing.T) {
+	var buf bytes.Buffer
+	w := NewWriter(&buf, false)
+	w.Details([]Detail{
+		{Label: "color", Value: "#abc"},
+		{Label: "file", Value: "~/x"},
+	})
+	got := buf.String()
+	want := "         color  #abc\n         file  ~/x\n"
+	if got != want {
+		t.Errorf("Details mismatch:\ngot:  %q\nwant: %q", got, want)
+	}
+}
+
+func TestDetails_HeaderRow(t *testing.T) {
+	var buf bytes.Buffer
+	w := NewWriter(&buf, false)
+	w.Details([]Detail{{Label: "keys", Value: ""}})
+	got := buf.String()
+	want := "         keys\n"
+	if got != want {
+		t.Errorf("Details header mismatch:\ngot:  %q\nwant: %q", got, want)
+	}
+}

@@ -49,3 +49,23 @@ func (w *Writer) badge(label, title string) {
 func (w *Writer) renderBadge(label string) string {
 	return label + strings.Repeat(" ", max(0, badgeWidth-len(label)))
 }
+
+// Detail is one row under a badge. Empty Value renders as a header line
+// (used to introduce a Bullets list, e.g. label "keys" above bullets).
+type Detail struct {
+	Label string
+	Value string
+}
+
+// Details writes detail rows at the continuation indent. Each row is
+// "<continuationIndent><label>  <value>" (or just "<continuationIndent><label>"
+// when Value is empty). Labels are not column-aligned across rows.
+func (w *Writer) Details(rows []Detail) {
+	for _, r := range rows {
+		if r.Value == "" {
+			fmt.Fprintf(w.out, "%s%s\n", continuationIndent, r.Label)
+		} else {
+			fmt.Fprintf(w.out, "%s%s  %s\n", continuationIndent, r.Label, r.Value)
+		}
+	}
+}
