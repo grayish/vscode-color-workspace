@@ -67,11 +67,6 @@ func (r *Runner) Run(opts Options) (*Result, error) {
 		return nil, err
 	}
 
-	c, src, err := ResolveColor(abs, opts.ColorInput)
-	if err != nil {
-		return nil, err
-	}
-
 	parent := filepath.Dir(abs)
 	folderName := filepath.Base(abs)
 	wsPath := filepath.Join(parent, folderName+".code-workspace")
@@ -80,10 +75,32 @@ func (r *Runner) Run(opts Options) (*Result, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	// Short-circuit: existing peacock workspace, no force → skip everything,
+	// just open. Guard 2 is intentionally not checked on this path.
 	if ws != nil && !opts.Force {
 		if keys := workspace.ExistingPeacockKeys(ws); len(keys) > 0 {
-			return nil, &GuardError{Guard: 1, Path: wsPath, Keys: keys}
+			res := &Result{
+				WorkspaceFile: wsPath,
+				Preconfigured: true,
+				PeacockKeys:   keys,
+			}
+			if !opts.NoOpen {
+				if err := r.Opener.Open(wsPath); err != nil {
+					if errors.Is(err, ErrCodeNotFound) {
+						res.Warnings = append(res.Warnings, "code CLI not on PATH; open manually: "+wsPath)
+					} else {
+						res.Warnings = append(res.Warnings, "failed to open with code: "+err.Error())
+					}
+				}
+			}
+			return res, nil
 		}
+	}
+
+	c, src, err := ResolveColor(abs, opts.ColorInput)
+	if err != nil {
+		return nil, err
 	}
 
 	settingsPath := filepath.Join(abs, ".vscode", "settings.json")
