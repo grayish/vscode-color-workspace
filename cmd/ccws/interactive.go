@@ -60,17 +60,65 @@ func runInteractive(args []string) error {
 	if err != nil {
 		return err
 	}
+
+	// Phase A: pre-check for an existing peacock-configured workspace.
+	wsPath, keys, err := detectPreconfigured(abs)
+	if err != nil {
+		return err
+	}
+	forcePreselected := false
+	if len(keys) > 0 {
+		var choice string
+		desc := fmt.Sprintf("%s\n%d peacock keys present", tui.ShortenPath(wsPath), len(keys))
+		if err := huh.NewSelect[string]().
+			Title("Workspace already configured").
+			Description(desc).
+			Options(
+				huh.NewOption("Open existing workspace", "open"),
+				huh.NewOption("Overwrite (start fresh)", "overwrite"),
+				huh.NewOption("Cancel", "cancel"),
+			).
+			Value(&choice).
+			Run(); err != nil {
+			return err
+		}
+		switch choice {
+		case "open":
+			opts := runner.Defaults()
+			opts.TargetDir = abs
+			res, err := runner.New(nil).Run(opts)
+			if err != nil {
+				return err
+			}
+			renderPreconfigured(tui.NewStderr(), res)
+			renderWarnings(tui.NewStderr(), res.Warnings)
+			return nil
+		case "cancel":
+			return nil
+		case "overwrite":
+			forcePreselected = true
+			// fall through to Phase B
+		}
+	}
+
+	// Phase B: regular form flow.
 	choices, err := interactive.Run(abs)
 	if err != nil {
 		return err
 	}
-
 	opts := interactive.ApplyToOptions(*choices, choices.TargetDir)
+	if forcePreselected {
+		opts.Force = true
+	}
 
 	for attempt := 0; attempt < 2; attempt++ {
 		res, err := runner.New(nil).Run(opts)
 		if err == nil {
-			renderSuccess(tui.NewStdout(), res, "")
+			if res.Preconfigured {
+				renderPreconfigured(tui.NewStderr(), res)
+			} else {
+				renderSuccess(tui.NewStdout(), res, "")
+			}
 			renderWarnings(tui.NewStderr(), res.Warnings)
 			return nil
 		}
