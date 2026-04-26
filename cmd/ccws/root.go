@@ -38,7 +38,8 @@ func rootCmd() *cobra.Command {
 		Long: `ccws generates a <parent>/<folder>.code-workspace file containing a
 Peacock-equivalent color palette, migrates existing peacock settings from
 <target>/.vscode/settings.json, and opens the workspace in VSCode.`,
-		Args: cobra.MaximumNArgs(1),
+		Version: version,
+		Args:    cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			target := "."
 			if len(args) == 1 {

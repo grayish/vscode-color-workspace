@@ -3,6 +3,9 @@ version: '3'
 vars:
   BINARY: ccws
   PKG: ./cmd/ccws
+  VERSION:
+    sh: git describe --tags --always --dirty 2>/dev/null || echo dev
+  LDFLAGS: -X main.version={{.VERSION}}
 
 tasks:
   default:
@@ -13,7 +16,7 @@ tasks:
   build:
     desc: Build the ccws binary to ./bin/
     cmds:
-      - go build -o bin/{{.BINARY}} {{.PKG}}
+      - go build -ldflags "{{.LDFLAGS}}" -o bin/{{.BINARY}} {{.PKG}}
     sources:
       - '**/*.go'
       - go.mod
@@ -24,7 +27,7 @@ tasks:
   install:
     desc: Install ccws to $GOBIN (or $GOPATH/bin)
     cmds:
-      - go install {{.PKG}}
+      - go install -ldflags "{{.LDFLAGS}}" {{.PKG}}
 
   run:
     desc: 'Run ccws (pass args after --, e.g. `task run -- --color red /tmp/foo`)'
