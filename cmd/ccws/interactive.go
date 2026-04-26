@@ -11,6 +11,7 @@ import (
 	"github.com/sang-bin/vscode-color-workspace/internal/interactive"
 	"github.com/sang-bin/vscode-color-workspace/internal/runner"
 	"github.com/sang-bin/vscode-color-workspace/internal/tui"
+	"github.com/sang-bin/vscode-color-workspace/internal/workspace"
 )
 
 func interactiveCmd() *cobra.Command {
@@ -22,6 +23,32 @@ func interactiveCmd() *cobra.Command {
 			return runInteractive(args)
 		},
 	}
+}
+
+// detectPreconfigured returns the workspace file path and existing peacock
+// keys when target/<...>.code-workspace already has peacock keys; otherwise
+// returns ("", nil, nil). A read error (other than "not exist") is returned
+// to the caller.
+func detectPreconfigured(target string) (string, []string, error) {
+	abs, err := filepath.Abs(target)
+	if err != nil {
+		return "", nil, err
+	}
+	parent := filepath.Dir(abs)
+	folderName := filepath.Base(abs)
+	wsPath := filepath.Join(parent, folderName+".code-workspace")
+	ws, err := workspace.Read(wsPath)
+	if err != nil {
+		return "", nil, err
+	}
+	if ws == nil {
+		return "", nil, nil
+	}
+	keys := workspace.ExistingPeacockKeys(ws)
+	if len(keys) == 0 {
+		return "", nil, nil
+	}
+	return wsPath, keys, nil
 }
 
 func runInteractive(args []string) error {
