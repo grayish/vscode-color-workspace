@@ -59,7 +59,7 @@ Running `ccws` in `/home/me/code/myproj` will:
 | 2 | Guard 2 triggered (non-peacock keys would remain in `.vscode/settings.json` after cleanup) |
 | 3 | filesystem error |
 
-> **Behavior change since v0.1:** prior versions exited with code 2 when the target's workspace file already contained peacock keys. As of this version, ccws prints a warning, opens the existing workspace, and exits 0. Shell scripts that depended on the old exit-2 path for this case must now check stderr for the "workspace already configured" notice or always pass `--force`.
+> **Behavior change:** prior versions exited with code 2 when the target's workspace file already contained peacock keys. As of this version, ccws prints a warning, opens the existing workspace, and exits 0. Shell scripts that depended on the old exit-2 path for this case must now check stderr for the "workspace already configured" notice or always pass `--force`.
 
 ## Non-goals
 

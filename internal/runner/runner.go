@@ -23,7 +23,7 @@ type GuardError struct {
 // Error returns a single-line summary used by %v, log lines, and errors.As
 // fallbacks. The full multi-line presentation is rendered by cmd/ccws.
 func (e *GuardError) Error() string {
-	return fmt.Sprintf("guard %d: %d conflicting keys in %s", e.Guard, len(e.Keys), e.Path)
+	return fmt.Sprintf("guard %d: %d residual keys in %s", e.Guard, len(e.Keys), e.Path)
 }
 
 // Result is the output of a successful Run.

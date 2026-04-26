@@ -34,7 +34,10 @@ func runInteractive(args []string) error {
 		return err
 	}
 
-	// Phase A: pre-check for an existing peacock-configured workspace.
+	// Phase A: when an existing peacock workspace is detected, offer a 3-option
+	// pre-check before the form. The huh.Select itself is not unit-tested
+	// (interactive UI); the data layer is covered by runner.CheckPreconfigured
+	// tests. Phase A is skipped entirely when len(keys) == 0.
 	wsPath, keys, err := runner.CheckPreconfigured(abs)
 	if err != nil {
 		return err

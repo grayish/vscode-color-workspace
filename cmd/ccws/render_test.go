@@ -3,6 +3,8 @@ package main
 import (
 	"bytes"
 	"errors"
+	"io"
+	"os"
 	"strings"
 	"testing"
 
@@ -137,5 +139,41 @@ func TestRenderPreconfigured_PlainOutput(t *testing.T) {
 		if !strings.Contains(got, want) {
 			t.Errorf("missing fragment %q in output:\n%s", want, got)
 		}
+	}
+}
+
+func TestRenderPreconfigured_NoColorEnv(t *testing.T) {
+	t.Setenv("NO_COLOR", "1")
+
+	// Capture os.Stderr so we can run renderPreconfigured(tui.NewStderr(), ...)
+	// through the env-aware constructor and inspect the output.
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	oldStderr := os.Stderr
+	os.Stderr = w
+	t.Cleanup(func() { os.Stderr = oldStderr })
+
+	res := &runner.Result{
+		WorkspaceFile: "/tmp/foo.code-workspace",
+		Preconfigured: true,
+		PeacockKeys:   []string{"settings.peacock.color"},
+	}
+	renderPreconfigured(tui.NewStderr(), res)
+
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+	var buf bytes.Buffer
+	if _, err := io.Copy(&buf, r); err != nil {
+		t.Fatal(err)
+	}
+	got := buf.String()
+	if strings.Contains(got, "\x1b[") {
+		t.Errorf("expected no ANSI escapes with NO_COLOR=1, got:\n%s", got)
+	}
+	if !strings.Contains(got, "workspace already configured") {
+		t.Errorf("expected the title text in output, got:\n%s", got)
 	}
 }
