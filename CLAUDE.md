@@ -35,13 +35,14 @@ Parity is enforced by `internal/color/golden_test.go` against 6 fixtures (5 plai
 
 Used in error messages, tests, and commit messages:
 
-- **Guard 1** — existing Peacock keys in the target `.code-workspace` (would overwrite).
-- **Guard 2** — non-Peacock keys would remain in `.vscode/settings.json` after cleanup.
-- Either triggers → exit code **2**. `--force` bypasses **both** (single flag by design).
+- **Guard 1 (soft)** — existing Peacock keys in the target `.code-workspace`. Default: warn + open existing, exit 0. Skips Guard 2 check on this path. `--force` overwrites and re-runs cleanup.
+- **Guard 2** — non-Peacock keys would remain in `.vscode/settings.json` after cleanup. Default: exit 2. `--force` bypasses.
+
+Either Guard 2 (or any other unhandled error) → CLI exit code 2/1/3 per `cmd/ccws/root.go:errToExit`. Interactive mode handles Guard 1 in a Phase A pre-check (`huh.Select`: Open existing / Overwrite / Cancel) and Guard 2 with a confirm prompt during the run.
 
 ## Exit codes
 
-`0` success · `1` input error · `2` safety guard · `3` filesystem error. Mapping lives in `cmd/ccws/root.go:errToExit`; interactive mode converts Guard errors into huh confirms, re-runs with `opts.Force = true` on accept.
+`0` success (including soft Guard 1) · `1` input error · `2` Guard 2 triggered · `3` filesystem error. Mapping lives in `cmd/ccws/root.go:errToExit`.
 
 ## Package import rule
 
