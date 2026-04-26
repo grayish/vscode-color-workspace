@@ -195,3 +195,55 @@ func TestRun_NoOpen(t *testing.T) {
 		t.Errorf("opener should not be called, got %d calls", len(opener.Calls))
 	}
 }
+
+func TestRun_Preconfigured_PeacockKeysPresent(t *testing.T) {
+	tmp := t.TempDir()
+	target := filepath.Join(tmp, "myproj")
+	if err := os.Mkdir(target, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	wsPath := filepath.Join(tmp, "myproj.code-workspace")
+	existing := `{"folders":[{"path":"./myproj"}],"settings":{"peacock.color":"#111111"}}`
+	if err := os.WriteFile(wsPath, []byte(existing), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	before, err := os.ReadFile(wsPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	opener := &FakeOpener{}
+	opts := Defaults()
+	opts.TargetDir = target
+	opts.ColorInput = "#222222" // should be ignored on short-circuit
+
+	res, err := New(opener).Run(opts)
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if !res.Preconfigured {
+		t.Errorf("Preconfigured = false, want true")
+	}
+	if res.WorkspaceFile != wsPath {
+		t.Errorf("WorkspaceFile = %q, want %q", res.WorkspaceFile, wsPath)
+	}
+	if len(res.PeacockKeys) == 0 {
+		t.Error("PeacockKeys should be non-empty")
+	}
+	if res.ColorHex != "" {
+		t.Errorf("ColorHex = %q, want empty (no color resolved on short-circuit)", res.ColorHex)
+	}
+	if res.SettingsCleaned {
+		t.Error("SettingsCleaned should be false on short-circuit")
+	}
+	after, err := os.ReadFile(wsPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(before, after) {
+		t.Errorf("workspace file should not be modified.\nbefore: %s\nafter:  %s", before, after)
+	}
+	if len(opener.Calls) != 1 || opener.Calls[0] != wsPath {
+		t.Errorf("opener calls = %v, want [%q]", opener.Calls, wsPath)
+	}
+}

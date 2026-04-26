@@ -32,6 +32,8 @@ type Result struct {
 	ColorHex        string
 	ColorSource     ColorSource
 	SettingsCleaned bool
+	Preconfigured   bool     // true when ws already had peacock keys and Force=false; nothing was written
+	PeacockKeys     []string // existing peacock keys detected on Preconfigured short-circuit (sorted, dotted paths)
 	Warnings        []string
 }
 
