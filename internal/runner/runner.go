@@ -16,8 +16,8 @@ import (
 // Carries data only; presentation is the CLI layer's responsibility.
 type GuardError struct {
 	Guard int
-	Path  string   // workspace file (Guard 1) or settings.json (Guard 2)
-	Keys  []string // conflicting / residual keys
+	Path  string   // path to the file containing the offending keys
+	Keys  []string // residual keys
 }
 
 // Error returns a single-line summary used by %v, log lines, and errors.As

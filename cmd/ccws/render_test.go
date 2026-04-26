@@ -21,38 +21,14 @@ func TestRenderError_Plain(t *testing.T) {
 	}
 }
 
-func TestRenderError_Guard1(t *testing.T) {
-	var buf bytes.Buffer
-	w := tui.NewWriter(&buf, false)
-	ge := &runner.GuardError{
-		Guard: 1,
-		Path:  "/tmp/foo.code-workspace",
-		Keys:  []string{"settings.peacock.color", "settings.workbench.colorCustomizations.activityBar.background"},
-	}
-	renderError(w, ge)
-	got := buf.String()
-	for _, want := range []string{
-		"  error  guard 1: existing peacock settings would be overwritten\n",
-		"         file  /tmp/foo.code-workspace\n",
-		"         keys\n",
-		"           • settings.peacock.color\n",
-		"           • settings.workbench.colorCustomizations.activityBar.background\n",
-		"         hint  rerun with --force to overwrite\n",
-	} {
-		if !strings.Contains(got, want) {
-			t.Errorf("missing fragment %q in output:\n%s", want, got)
-		}
-	}
-}
-
-func TestRenderError_Guard1_Truncates(t *testing.T) {
+func TestRenderError_Truncates(t *testing.T) {
 	keys := make([]string, 17)
 	for i := range keys {
 		keys[i] = "k" + string(rune('0'+i%10))
 	}
 	var buf bytes.Buffer
 	w := tui.NewWriter(&buf, false)
-	renderError(w, &runner.GuardError{Guard: 1, Path: "/tmp/x", Keys: keys})
+	renderError(w, &runner.GuardError{Guard: 2, Path: "/tmp/x", Keys: keys})
 	got := buf.String()
 	if !strings.Contains(got, "…(9 more)") {
 		t.Errorf("expected '…(9 more)' truncation, got:\n%s", got)

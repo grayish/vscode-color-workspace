@@ -36,25 +36,16 @@ func writeGuardBody(w *tui.Writer, ge *runner.GuardError) {
 		{Label: "keys"},
 	})
 	w.Bullets(ge.Keys, maxBulletsShown)
-	w.Details([]tui.Detail{{Label: "hint", Value: guardHint(ge)}})
+	w.Details([]tui.Detail{{Label: "hint", Value: "remove those keys manually or rerun with --force"}})
 }
 
 func guardTitle(ge *runner.GuardError) string {
 	switch ge.Guard {
-	case 1:
-		return "guard 1: existing peacock settings would be overwritten"
 	case 2:
 		return "guard 2: non-peacock keys would remain in .vscode/settings.json"
 	default:
 		return fmt.Sprintf("guard %d", ge.Guard)
 	}
-}
-
-func guardHint(ge *runner.GuardError) string {
-	if ge.Guard == 2 {
-		return "remove those keys manually or rerun with --force"
-	}
-	return "rerun with --force to overwrite"
 }
 
 // renderSuccess writes the success block. Empty srcLabel suppresses the
