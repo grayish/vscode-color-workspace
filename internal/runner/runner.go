@@ -162,6 +162,35 @@ func (r *Runner) Run(opts Options) (*Result, error) {
 	}, nil
 }
 
+// CheckPreconfigured reports whether target/<...>.code-workspace already
+// contains peacock keys. Returns the absolute workspace file path and the
+// detected keys when present; otherwise returns ("", nil, nil). Filesystem
+// or parse errors propagate to the caller.
+//
+// Used by interactive Phase A to detect whether to show the "already
+// configured" prompt before invoking the form.
+func CheckPreconfigured(target string) (string, []string, error) {
+	abs, err := filepath.Abs(target)
+	if err != nil {
+		return "", nil, err
+	}
+	parent := filepath.Dir(abs)
+	folderName := filepath.Base(abs)
+	wsPath := filepath.Join(parent, folderName+".code-workspace")
+	ws, err := workspace.Read(wsPath)
+	if err != nil {
+		return "", nil, err
+	}
+	if ws == nil {
+		return "", nil, nil
+	}
+	keys := workspace.ExistingPeacockKeys(ws)
+	if len(keys) == 0 {
+		return "", nil, nil
+	}
+	return wsPath, keys, nil
+}
+
 func isGitRepo(dir string) bool {
 	_, err := os.Stat(filepath.Join(dir, ".git"))
 	return err == nil

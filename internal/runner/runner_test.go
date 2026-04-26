@@ -270,3 +270,130 @@ func TestRun_Preconfigured_OpenerError(t *testing.T) {
 		t.Errorf("Warnings[0] = %q, want substring %q", res.Warnings[0], "code CLI not on PATH")
 	}
 }
+
+func TestCheckPreconfigured_PeacockKeysPresent(t *testing.T) {
+	tmp := t.TempDir()
+	target := filepath.Join(tmp, "myproj")
+	if err := os.Mkdir(target, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	wsPath := filepath.Join(tmp, "myproj.code-workspace")
+	if err := os.WriteFile(wsPath, []byte(`{"folders":[{"path":"./myproj"}],"settings":{"peacock.color":"#abcdef"}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	gotPath, gotKeys, err := CheckPreconfigured(target)
+	if err != nil {
+		t.Fatalf("CheckPreconfigured: %v", err)
+	}
+	if gotPath != wsPath {
+		t.Errorf("path = %q, want %q", gotPath, wsPath)
+	}
+	if len(gotKeys) == 0 {
+		t.Error("keys should be non-empty")
+	}
+}
+
+func TestCheckPreconfigured_NoPeacockKeys(t *testing.T) {
+	tmp := t.TempDir()
+	target := filepath.Join(tmp, "myproj")
+	if err := os.Mkdir(target, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	wsPath := filepath.Join(tmp, "myproj.code-workspace")
+	if err := os.WriteFile(wsPath, []byte(`{"folders":[{"path":"./myproj"}],"settings":{"editor.tabSize":2}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	gotPath, gotKeys, err := CheckPreconfigured(target)
+	if err != nil {
+		t.Fatalf("CheckPreconfigured: %v", err)
+	}
+	if gotPath != "" {
+		t.Errorf("path = %q, want empty (no peacock keys)", gotPath)
+	}
+	if len(gotKeys) != 0 {
+		t.Errorf("keys = %v, want empty", gotKeys)
+	}
+}
+
+func TestCheckPreconfigured_NoFile(t *testing.T) {
+	tmp := t.TempDir()
+	target := filepath.Join(tmp, "myproj")
+	if err := os.Mkdir(target, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	gotPath, gotKeys, err := CheckPreconfigured(target)
+	if err != nil {
+		t.Fatalf("CheckPreconfigured: %v", err)
+	}
+	if gotPath != "" || len(gotKeys) != 0 {
+		t.Errorf("expected empty path/keys when ws file does not exist, got (%q, %v)", gotPath, gotKeys)
+	}
+}
+
+func TestCheckPreconfigured_Unreadable(t *testing.T) {
+	tmp := t.TempDir()
+	target := filepath.Join(tmp, "myproj")
+	if err := os.Mkdir(target, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	wsPath := filepath.Join(tmp, "myproj.code-workspace")
+	// Write a malformed JSON workspace file — workspace.Read should return a parse error.
+	if err := os.WriteFile(wsPath, []byte(`{"folders":[`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	gotPath, gotKeys, err := CheckPreconfigured(target)
+	if err == nil {
+		t.Fatalf("expected parse error, got path=%q keys=%v", gotPath, gotKeys)
+	}
+	if gotPath != "" {
+		t.Errorf("path = %q, want empty on error", gotPath)
+	}
+	if gotKeys != nil {
+		t.Errorf("keys = %v, want nil on error", gotKeys)
+	}
+}
+
+func TestRun_NoPeacockKeys_MergeStillWorks(t *testing.T) {
+	tmp := t.TempDir()
+	target := filepath.Join(tmp, "myproj")
+	if err := os.Mkdir(target, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	wsPath := filepath.Join(tmp, "myproj.code-workspace")
+	// Pre-existing workspace with no peacock keys (just a folders entry and an unrelated setting).
+	existing := `{"folders":[{"path":"./myproj"}],"settings":{"editor.tabSize":2}}`
+	if err := os.WriteFile(wsPath, []byte(existing), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	opts := Defaults()
+	opts.TargetDir = target
+	opts.ColorInput = "#abcdef"
+
+	res, err := New(&FakeOpener{}).Run(opts)
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if res.Preconfigured {
+		t.Errorf("Preconfigured = true, want false (no peacock keys present means short-circuit must NOT trigger)")
+	}
+	if res.ColorHex != "#abcdef" {
+		t.Errorf("ColorHex = %q, want %q", res.ColorHex, "#abcdef")
+	}
+	// Workspace file must now contain the peacock color (merged in).
+	data, err := os.ReadFile(wsPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Contains(data, []byte("#abcdef")) {
+		t.Errorf("expected merged peacock color in workspace file, content:\n%s", data)
+	}
+	// The pre-existing unrelated setting must still be there.
+	if !bytes.Contains(data, []byte("editor.tabSize")) {
+		t.Errorf("expected pre-existing editor.tabSize to be preserved, content:\n%s", data)
+	}
+}

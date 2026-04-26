@@ -106,7 +106,7 @@ func TestRenderWarnings_Empty(t *testing.T) {
 }
 
 func TestGuardDescription_Plain(t *testing.T) {
-	ge := &runner.GuardError{Guard: 1, Path: "/tmp/x", Keys: []string{"a", "b"}}
+	ge := &runner.GuardError{Guard: 2, Path: "/tmp/x", Keys: []string{"a", "b"}}
 	got := guardDescription(ge)
 	if strings.Contains(got, "\x1b[") {
 		t.Errorf("guardDescription should be plain text (no ANSI), got %q", got)
