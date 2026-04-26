@@ -170,13 +170,10 @@ func (r *Runner) Run(opts Options) (*Result, error) {
 // Used by interactive Phase A to detect whether to show the "already
 // configured" prompt before invoking the form.
 func CheckPreconfigured(target string) (string, []string, error) {
-	abs, err := filepath.Abs(target)
+	wsPath, err := workspaceFilePath(target)
 	if err != nil {
 		return "", nil, err
 	}
-	parent := filepath.Dir(abs)
-	folderName := filepath.Base(abs)
-	wsPath := filepath.Join(parent, folderName+".code-workspace")
 	ws, err := workspace.Read(wsPath)
 	if err != nil {
 		return "", nil, err
@@ -189,6 +186,16 @@ func CheckPreconfigured(target string) (string, []string, error) {
 		return "", nil, nil
 	}
 	return wsPath, keys, nil
+}
+
+// workspaceFilePath returns the absolute path of the <parent>/<folder>.code-workspace
+// file for target without touching the filesystem.
+func workspaceFilePath(target string) (string, error) {
+	abs, err := filepath.Abs(target)
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(filepath.Dir(abs), filepath.Base(abs)+".code-workspace"), nil
 }
 
 func isGitRepo(dir string) bool {

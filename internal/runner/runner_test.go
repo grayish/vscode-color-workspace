@@ -9,6 +9,24 @@ import (
 	"testing"
 )
 
+// makePreconfiguredFixture creates a temp myproj directory and a sibling
+// myproj.code-workspace that already contains a peacock.color key.
+// Returns (targetDir, wsFilePath).
+func makePreconfiguredFixture(t *testing.T) (string, string) {
+	t.Helper()
+	tmp := t.TempDir()
+	target := filepath.Join(tmp, "myproj")
+	if err := os.Mkdir(target, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	wsPath := filepath.Join(tmp, "myproj.code-workspace")
+	content := `{"folders":[{"path":"./myproj"}],"settings":{"peacock.color":"#111111"}}`
+	if err := os.WriteFile(wsPath, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return target, wsPath
+}
+
 func TestRun_NewProject_Random(t *testing.T) {
 	tmp := t.TempDir()
 	target := filepath.Join(tmp, "myproj")
@@ -80,15 +98,7 @@ func TestRun_Migrate(t *testing.T) {
 }
 
 func TestRun_Force_BypassesPreconfigured(t *testing.T) {
-	tmp := t.TempDir()
-	target := filepath.Join(tmp, "myproj")
-	if err := os.Mkdir(target, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	wsPath := filepath.Join(tmp, "myproj.code-workspace")
-	if err := os.WriteFile(wsPath, []byte(`{"folders":[{"path":"./myproj"}],"settings":{"peacock.color":"#111111"}}`), 0o644); err != nil {
-		t.Fatal(err)
-	}
+	target, wsPath := makePreconfiguredFixture(t)
 	opts := Defaults()
 	opts.TargetDir = target
 	opts.ColorInput = "#222222"
@@ -161,16 +171,7 @@ func TestRun_NoOpen(t *testing.T) {
 }
 
 func TestRun_Preconfigured_PeacockKeysPresent(t *testing.T) {
-	tmp := t.TempDir()
-	target := filepath.Join(tmp, "myproj")
-	if err := os.Mkdir(target, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	wsPath := filepath.Join(tmp, "myproj.code-workspace")
-	existing := `{"folders":[{"path":"./myproj"}],"settings":{"peacock.color":"#111111"}}`
-	if err := os.WriteFile(wsPath, []byte(existing), 0o644); err != nil {
-		t.Fatal(err)
-	}
+	target, wsPath := makePreconfiguredFixture(t)
 	before, err := os.ReadFile(wsPath)
 	if err != nil {
 		t.Fatal(err)
@@ -216,15 +217,7 @@ func TestRun_Preconfigured_PeacockKeysPresent(t *testing.T) {
 }
 
 func TestRun_Preconfigured_NoOpen(t *testing.T) {
-	tmp := t.TempDir()
-	target := filepath.Join(tmp, "myproj")
-	if err := os.Mkdir(target, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	wsPath := filepath.Join(tmp, "myproj.code-workspace")
-	if err := os.WriteFile(wsPath, []byte(`{"folders":[{"path":"./myproj"}],"settings":{"peacock.color":"#111111"}}`), 0o644); err != nil {
-		t.Fatal(err)
-	}
+	target, _ := makePreconfiguredFixture(t)
 	opener := &FakeOpener{}
 	opts := Defaults()
 	opts.TargetDir = target
@@ -243,15 +236,7 @@ func TestRun_Preconfigured_NoOpen(t *testing.T) {
 }
 
 func TestRun_Preconfigured_OpenerError(t *testing.T) {
-	tmp := t.TempDir()
-	target := filepath.Join(tmp, "myproj")
-	if err := os.Mkdir(target, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	wsPath := filepath.Join(tmp, "myproj.code-workspace")
-	if err := os.WriteFile(wsPath, []byte(`{"folders":[{"path":"./myproj"}],"settings":{"peacock.color":"#111111"}}`), 0o644); err != nil {
-		t.Fatal(err)
-	}
+	target, _ := makePreconfiguredFixture(t)
 	opener := &FakeOpener{Err: ErrCodeNotFound}
 	opts := Defaults()
 	opts.TargetDir = target
