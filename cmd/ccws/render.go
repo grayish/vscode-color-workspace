@@ -76,3 +76,15 @@ func renderWarnings(w *tui.Writer, warnings []string) {
 		w.Warn(msg)
 	}
 }
+
+// renderPreconfigured writes the warn block for the short-circuit case
+// where the workspace already has peacock keys and ccws skipped the write.
+func renderPreconfigured(w *tui.Writer, res *runner.Result) {
+	w.Warn("workspace already configured")
+	const colWidth = 12 // len("peacock keys"), the longest label
+	w.Details([]tui.Detail{
+		{Label: fmt.Sprintf("%-*s", colWidth, "workspace"), Value: tui.ShortenPath(res.WorkspaceFile)},
+		{Label: fmt.Sprintf("%-*s", colWidth, "peacock keys"), Value: fmt.Sprintf("%d existing", len(res.PeacockKeys))},
+		{Label: fmt.Sprintf("%-*s", colWidth, "hint"), Value: "use --force to overwrite (other flags ignored)"},
+	})
+}

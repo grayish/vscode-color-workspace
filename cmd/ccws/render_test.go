@@ -141,3 +141,25 @@ func TestGuardDescription_Plain(t *testing.T) {
 		}
 	}
 }
+
+func TestRenderPreconfigured_PlainOutput(t *testing.T) {
+	var buf bytes.Buffer
+	w := tui.NewWriter(&buf, false)
+	res := &runner.Result{
+		WorkspaceFile: "/tmp/foo.code-workspace",
+		Preconfigured: true,
+		PeacockKeys:   []string{"settings.peacock.color", "settings.workbench.colorCustomizations.activityBar.background", "settings.workbench.colorCustomizations.titleBar.activeBackground"},
+	}
+	renderPreconfigured(w, res)
+	got := buf.String()
+	for _, want := range []string{
+		"  warn   workspace already configured\n",
+		"         workspace     /tmp/foo.code-workspace\n",
+		"         peacock keys  3 existing\n",
+		"         hint          use --force to overwrite (other flags ignored)\n",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("missing fragment %q in output:\n%s", want, got)
+		}
+	}
+}
