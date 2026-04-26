@@ -214,3 +214,59 @@ func TestRun_Preconfigured_PeacockKeysPresent(t *testing.T) {
 		t.Errorf("opener calls = %v, want [%q]", opener.Calls, wsPath)
 	}
 }
+
+func TestRun_Preconfigured_NoOpen(t *testing.T) {
+	tmp := t.TempDir()
+	target := filepath.Join(tmp, "myproj")
+	if err := os.Mkdir(target, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	wsPath := filepath.Join(tmp, "myproj.code-workspace")
+	if err := os.WriteFile(wsPath, []byte(`{"folders":[{"path":"./myproj"}],"settings":{"peacock.color":"#111111"}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	opener := &FakeOpener{}
+	opts := Defaults()
+	opts.TargetDir = target
+	opts.NoOpen = true
+
+	res, err := New(opener).Run(opts)
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if !res.Preconfigured {
+		t.Errorf("Preconfigured = false, want true")
+	}
+	if len(opener.Calls) != 0 {
+		t.Errorf("opener should not be called with NoOpen=true, got %d calls", len(opener.Calls))
+	}
+}
+
+func TestRun_Preconfigured_OpenerError(t *testing.T) {
+	tmp := t.TempDir()
+	target := filepath.Join(tmp, "myproj")
+	if err := os.Mkdir(target, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	wsPath := filepath.Join(tmp, "myproj.code-workspace")
+	if err := os.WriteFile(wsPath, []byte(`{"folders":[{"path":"./myproj"}],"settings":{"peacock.color":"#111111"}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	opener := &FakeOpener{Err: ErrCodeNotFound}
+	opts := Defaults()
+	opts.TargetDir = target
+
+	res, err := New(opener).Run(opts)
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if !res.Preconfigured {
+		t.Errorf("Preconfigured = false, want true")
+	}
+	if len(res.Warnings) == 0 {
+		t.Fatal("expected a warning when opener fails")
+	}
+	if !strings.Contains(res.Warnings[0], "code CLI not on PATH") {
+		t.Errorf("Warnings[0] = %q, want substring %q", res.Warnings[0], "code CLI not on PATH")
+	}
+}
