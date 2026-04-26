@@ -227,11 +227,14 @@ func TestRun_Preconfigured_PeacockKeysPresent(t *testing.T) {
 	if res.WorkspaceFile != wsPath {
 		t.Errorf("WorkspaceFile = %q, want %q", res.WorkspaceFile, wsPath)
 	}
-	if len(res.PeacockKeys) == 0 {
-		t.Error("PeacockKeys should be non-empty")
+	if len(res.PeacockKeys) != 1 || res.PeacockKeys[0] != "settings.peacock.color" {
+		t.Errorf("PeacockKeys = %v, want [\"settings.peacock.color\"]", res.PeacockKeys)
 	}
 	if res.ColorHex != "" {
 		t.Errorf("ColorHex = %q, want empty (no color resolved on short-circuit)", res.ColorHex)
+	}
+	if res.ColorSource != 0 {
+		t.Errorf("ColorSource = %v, want zero on short-circuit", res.ColorSource)
 	}
 	if res.SettingsCleaned {
 		t.Error("SettingsCleaned should be false on short-circuit")
