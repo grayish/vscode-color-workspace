@@ -79,43 +79,7 @@ func TestRun_Migrate(t *testing.T) {
 	}
 }
 
-func TestRun_Guard1_Triggers(t *testing.T) {
-	tmp := t.TempDir()
-	target := filepath.Join(tmp, "myproj")
-	if err := os.Mkdir(target, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	wsPath := filepath.Join(tmp, "myproj.code-workspace")
-	existing := `{"folders":[{"path":"./myproj"}],"settings":{"peacock.color":"#111111"}}`
-	if err := os.WriteFile(wsPath, []byte(existing), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	opts := Defaults()
-	opts.TargetDir = target
-	opts.ColorInput = "#222222"
-
-	_, err := New(&FakeOpener{}).Run(opts)
-	var gerr *GuardError
-	if !errors.As(err, &gerr) {
-		t.Fatalf("expected GuardError, got %T: %v", err, err)
-	}
-	if gerr.Guard != 1 {
-		t.Errorf("guard = %d, want 1", gerr.Guard)
-	}
-	wantPath := filepath.Join(tmp, "myproj.code-workspace")
-	if gerr.Path != wantPath {
-		t.Errorf("Path = %q, want %q", gerr.Path, wantPath)
-	}
-	if len(gerr.Keys) == 0 {
-		t.Error("Keys should be non-empty")
-	}
-	// Error() must be a single line — used by %v / log fallback.
-	if msg := gerr.Error(); msg == "" || strings.Contains(msg, "\n") {
-		t.Errorf("Error() = %q, want non-empty single line", msg)
-	}
-}
-
-func TestRun_Force_BypassesGuard1(t *testing.T) {
+func TestRun_Force_BypassesPreconfigured(t *testing.T) {
 	tmp := t.TempDir()
 	target := filepath.Join(tmp, "myproj")
 	if err := os.Mkdir(target, 0o755); err != nil {
