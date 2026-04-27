@@ -7,7 +7,10 @@ import (
 	"bufio"
 	"bytes"
 	"errors"
+	"fmt"
 	"hash/fnv"
+	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 )
@@ -108,4 +111,53 @@ func FindSelf(worktrees []Worktree, targetDir string) *Worktree {
 		}
 	}
 	return best
+}
+
+// List runs `git worktree list --porcelain` from targetDir and returns the
+// resulting Worktree slice. The first entry is the main worktree (IsMain set).
+// GitDir is populated for each entry: <path>/.git for main, the gitdir-pointer
+// target for linked worktrees.
+//
+// Any failure (git missing, target not in a repo, parse anomaly, bare-only
+// output) collapses to ErrNotInWorktree so callers can silently skip
+// worktree-aware logic and fall through to the existing resolution chain.
+func List(targetDir string) ([]Worktree, error) {
+	cmd := exec.Command("git", "-C", targetDir, "worktree", "list", "--porcelain")
+	out, err := cmd.Output()
+	if err != nil {
+		return nil, ErrNotInWorktree
+	}
+	worktrees, err := parsePorcelain(out)
+	if err != nil || len(worktrees) == 0 {
+		return nil, ErrNotInWorktree
+	}
+	if worktrees[0].Bare {
+		return nil, ErrNotInWorktree
+	}
+	worktrees[0].IsMain = true
+	worktrees[0].GitDir = filepath.Join(worktrees[0].Path, ".git")
+	for i := 1; i < len(worktrees); i++ {
+		gd, err := readGitDirPointer(worktrees[i].Path)
+		if err != nil {
+			return nil, fmt.Errorf("read .git pointer for %q: %w", worktrees[i].Path, ErrNotInWorktree)
+		}
+		worktrees[i].GitDir = gd
+	}
+	return worktrees, nil
+}
+
+// readGitDirPointer reads <path>/.git as a text file (linked worktrees have
+// `.git` as a file with a "gitdir: <abs path>" line) and returns the pointed-to
+// gitdir path.
+func readGitDirPointer(path string) (string, error) {
+	data, err := os.ReadFile(filepath.Join(path, ".git"))
+	if err != nil {
+		return "", err
+	}
+	for _, line := range strings.Split(string(data), "\n") {
+		if strings.HasPrefix(line, "gitdir:") {
+			return strings.TrimSpace(strings.TrimPrefix(line, "gitdir:")), nil
+		}
+	}
+	return "", fmt.Errorf("no gitdir: line in %q", path)
 }
