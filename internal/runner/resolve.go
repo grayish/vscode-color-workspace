@@ -116,16 +116,34 @@ func readWorkspacePeacockColor(path string) (*color.Color, error) {
 //	ok=true  → color decided by worktree logic; caller uses (c, src, warns, intent)
 //	ok=false → fall through to settings/random; warns may carry a Case-D notice
 //	err!=nil → hard error (e.g., file write failure for AnchorIntent)
-//
-// Stub for now: always falls through.
 func resolveFromWorktree(targetDir string) (color.Color, ColorSource, []string, *AnchorIntent, bool, error) {
-	_, err := listWorktreesFn(targetDir)
+	worktrees, err := listWorktreesFn(targetDir)
 	if errors.Is(err, gitworktree.ErrNotInWorktree) {
 		return color.Color{}, 0, nil, nil, false, nil
 	}
 	if err != nil {
 		return color.Color{}, 0, nil, nil, false, err
 	}
-	// Real implementation comes in Tasks 7-9.
+	self := gitworktree.FindSelf(worktrees, targetDir)
+	if self == nil {
+		return color.Color{}, 0, nil, nil, false, nil
+	}
+	main := worktrees[0]
+	mainWsPath, err := workspaceFilePath(main.Path)
+	if err != nil {
+		return color.Color{}, 0, nil, nil, false, err
+	}
+	mainColor, err := readWorkspacePeacockColor(mainWsPath)
+	if err != nil {
+		return color.Color{}, 0, nil, nil, false, err
+	}
+
+	// Case A: main has a color — anchor + offset
+	if mainColor != nil {
+		offset := color.LadderOffset(gitworktree.IdentityHash(*self))
+		return mainColor.ApplyLightness(offset), SourceWorktree, nil, nil, true, nil
+	}
+
+	// Cases B/C/D land in subsequent tasks — for now, fall through.
 	return color.Color{}, 0, nil, nil, false, nil
 }
