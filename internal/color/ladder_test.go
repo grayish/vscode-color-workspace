@@ -1,0 +1,70 @@
+package color
+
+import "testing"
+
+func TestLadderSteps_NoZero(t *testing.T) {
+	for _, s := range LadderSteps {
+		if s == 0 {
+			t.Fatal("LadderSteps must not contain 0; that slot is reserved for main worktree")
+		}
+	}
+}
+
+func TestLadderOffset_ZeroHashIsZero(t *testing.T) {
+	if got := LadderOffset(0); got != 0 {
+		t.Errorf("LadderOffset(0) = %v, want 0", got)
+	}
+}
+
+func TestLadderOffset_NonZeroInRange(t *testing.T) {
+	allowed := map[float64]bool{}
+	for _, s := range LadderSteps {
+		allowed[s] = true
+	}
+	for hash := uint64(1); hash < 1000; hash++ {
+		got := LadderOffset(hash)
+		if !allowed[got] {
+			t.Fatalf("LadderOffset(%d) = %v, not in %v", hash, got, LadderSteps)
+		}
+	}
+}
+
+func TestLadderOffset_Stable(t *testing.T) {
+	for hash := uint64(1); hash < 100; hash++ {
+		a := LadderOffset(hash)
+		b := LadderOffset(hash)
+		if a != b {
+			t.Errorf("LadderOffset(%d) not stable: %v vs %v", hash, a, b)
+		}
+	}
+}
+
+func TestApplyLightness_PositiveLightens(t *testing.T) {
+	base := Color{R: 90, G: 59, B: 140} // #5a3b8c, L≈39%
+	lighter := base.ApplyLightness(10)
+	if lighter == base {
+		t.Error("ApplyLightness(+10) returned base unchanged")
+	}
+	// crude sanity: lighter color has higher channel sum
+	if int(lighter.R)+int(lighter.G)+int(lighter.B) <= int(base.R)+int(base.G)+int(base.B) {
+		t.Errorf("ApplyLightness(+10) did not lighten: base=%v lighter=%v", base, lighter)
+	}
+}
+
+func TestApplyLightness_NegativeDarkens(t *testing.T) {
+	base := Color{R: 90, G: 59, B: 140}
+	darker := base.ApplyLightness(-10)
+	if darker == base {
+		t.Error("ApplyLightness(-10) returned base unchanged")
+	}
+	if int(darker.R)+int(darker.G)+int(darker.B) >= int(base.R)+int(base.G)+int(base.B) {
+		t.Errorf("ApplyLightness(-10) did not darken: base=%v darker=%v", base, darker)
+	}
+}
+
+func TestApplyLightness_ZeroIsNoop(t *testing.T) {
+	base := Color{R: 90, G: 59, B: 140}
+	if got := base.ApplyLightness(0); got != base {
+		t.Errorf("ApplyLightness(0) = %v, want %v", got, base)
+	}
+}
