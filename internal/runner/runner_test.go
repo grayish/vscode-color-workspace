@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/sang-bin/vscode-color-workspace/internal/gitworktree"
 )
 
 // makePreconfiguredFixture creates a temp myproj directory and a sibling
@@ -339,6 +341,61 @@ func TestCheckPreconfigured_Unreadable(t *testing.T) {
 	}
 	if gotKeys != nil {
 		t.Errorf("keys = %v, want nil on error", gotKeys)
+	}
+}
+
+func TestRun_WorktreeCaseC_WritesMainAnchor(t *testing.T) {
+	base := t.TempDir()
+	mainPath := filepath.Join(base, "myproj")
+	linkedPath := filepath.Join(base, "myproj-feat-x")
+	if err := os.MkdirAll(mainPath, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(linkedPath, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	orig := listWorktreesFn
+	t.Cleanup(func() { listWorktreesFn = orig })
+	listWorktreesFn = func(string) ([]gitworktree.Worktree, error) {
+		return []gitworktree.Worktree{
+			{Path: mainPath, GitDir: filepath.Join(mainPath, ".git"), IsMain: true},
+			{Path: linkedPath, GitDir: filepath.Join(mainPath, ".git/worktrees/feat-x"), IsMain: false},
+		}, nil
+	}
+
+	opts := Defaults()
+	opts.TargetDir = linkedPath
+	opts.NoOpen = true
+
+	r := New(nil)
+	res, err := r.Run(opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Linked workspace must have been written.
+	linkedWsPath := filepath.Join(base, "myproj-feat-x.code-workspace")
+	if _, err := os.Stat(linkedWsPath); err != nil {
+		t.Errorf("linked workspace not written: %v", err)
+	}
+	// Main workspace must have been written by AnchorIntent side effect.
+	mainWsPath := filepath.Join(base, "myproj.code-workspace")
+	if _, err := os.Stat(mainWsPath); err != nil {
+		t.Errorf("main anchor workspace not written: %v", err)
+	}
+	// The result must report a worktree-sourced color and surface the warning.
+	if res.ColorSource != SourceWorktree {
+		t.Errorf("ColorSource = %v, want SourceWorktree", res.ColorSource)
+	}
+	hasAnchorWarn := false
+	for _, w := range res.Warnings {
+		if strings.Contains(w, "family anchor created") {
+			hasAnchorWarn = true
+		}
+	}
+	if !hasAnchorWarn {
+		t.Errorf("warnings = %v, want anchor-created notice", res.Warnings)
 	}
 }
 
