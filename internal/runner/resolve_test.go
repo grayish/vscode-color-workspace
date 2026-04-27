@@ -197,3 +197,75 @@ func TestResolveColor_WorktreeCaseA_MainTarget(t *testing.T) {
 		t.Errorf("main color = %v, want %v (offset 0)", c, want)
 	}
 }
+
+func TestResolveColor_WorktreeCaseD_TargetMain(t *testing.T) {
+	base := t.TempDir()
+	mainPath := filepath.Join(base, "myproj")
+	linkedPath := filepath.Join(base, "myproj-feat-x")
+	if err := os.MkdirAll(mainPath, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(linkedPath, 0755); err != nil {
+		t.Fatal(err)
+	}
+	// linked has a color; main does not
+	writeWorkspaceWithColor(t, filepath.Join(base, "myproj-feat-x.code-workspace"), "#4a8b5c")
+
+	withFakeWorktrees(t, []gitworktree.Worktree{
+		{Path: mainPath, GitDir: filepath.Join(mainPath, ".git"), IsMain: true},
+		{Path: linkedPath, GitDir: filepath.Join(mainPath, ".git/worktrees/feat-x"), IsMain: false},
+	}, nil)
+
+	_, src, warns, intent, err := ResolveColor(mainPath, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if src != SourceRandom {
+		t.Errorf("source = %v, want SourceRandom (Case D falls back)", src)
+	}
+	if intent != nil {
+		t.Errorf("intent = %v, want nil (Case D writes nothing)", intent)
+	}
+	if len(warns) == 0 {
+		t.Fatal("warns empty; want family-disabled warning")
+	}
+	if !strings.Contains(warns[0], "family disabled") {
+		t.Errorf("warning text = %q, want substring %q", warns[0], "family disabled")
+	}
+	if !strings.Contains(warns[0], "#4a8b5c") {
+		t.Errorf("warning text = %q, want linked hex", warns[0])
+	}
+}
+
+func TestResolveColor_WorktreeCaseD_TargetOtherLinked(t *testing.T) {
+	base := t.TempDir()
+	mainPath := filepath.Join(base, "myproj")
+	linkedAPath := filepath.Join(base, "myproj-feat-x")
+	linkedBPath := filepath.Join(base, "myproj-bugfix")
+	for _, p := range []string{mainPath, linkedAPath, linkedBPath} {
+		if err := os.MkdirAll(p, 0755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	writeWorkspaceWithColor(t, filepath.Join(base, "myproj-feat-x.code-workspace"), "#4a8b5c")
+
+	withFakeWorktrees(t, []gitworktree.Worktree{
+		{Path: mainPath, GitDir: filepath.Join(mainPath, ".git"), IsMain: true},
+		{Path: linkedAPath, GitDir: filepath.Join(mainPath, ".git/worktrees/feat-x"), IsMain: false},
+		{Path: linkedBPath, GitDir: filepath.Join(mainPath, ".git/worktrees/bugfix"), IsMain: false},
+	}, nil)
+
+	_, src, warns, intent, err := ResolveColor(linkedBPath, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if src != SourceRandom {
+		t.Errorf("source = %v, want SourceRandom", src)
+	}
+	if intent != nil {
+		t.Errorf("intent = %v, want nil", intent)
+	}
+	if len(warns) == 0 || !strings.Contains(warns[0], "family disabled") {
+		t.Errorf("warns = %v, want a family-disabled notice", warns)
+	}
+}

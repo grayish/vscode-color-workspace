@@ -144,6 +144,54 @@ func resolveFromWorktree(targetDir string) (color.Color, ColorSource, []string, 
 		return mainColor.ApplyLightness(offset), SourceWorktree, nil, nil, true, nil
 	}
 
-	// Cases B/C/D land in subsequent tasks — for now, fall through.
+	// main has no color — check whether any other linked worktree has one
+	linked, linkedColor, err := findLinkedWithColor(worktrees, self)
+	if err != nil {
+		return color.Color{}, 0, nil, nil, false, err
+	}
+
+	// Case D: linked has color but main does not — refuse to derive a family
+	if linked != nil {
+		warn := formatFamilyDisabledWarning(linked, linkedColor, main, mainWsPath)
+		return color.Color{}, 0, []string{warn}, nil, false, nil
+	}
+
+	// Cases B/C land in Task 9 — for now, fall through.
 	return color.Color{}, 0, nil, nil, false, nil
+}
+
+// findLinkedWithColor returns the first non-main worktree (excluding self)
+// whose .code-workspace has a peacock.color, along with that color.
+func findLinkedWithColor(worktrees []gitworktree.Worktree, self *gitworktree.Worktree) (*gitworktree.Worktree, *color.Color, error) {
+	for i := range worktrees {
+		w := &worktrees[i]
+		if w.IsMain || w.Path == self.Path {
+			continue
+		}
+		wsPath, err := workspaceFilePath(w.Path)
+		if err != nil {
+			return nil, nil, err
+		}
+		c, err := readWorkspacePeacockColor(wsPath)
+		if err != nil {
+			return nil, nil, err
+		}
+		if c != nil {
+			return w, c, nil
+		}
+	}
+	return nil, nil, nil
+}
+
+func formatFamilyDisabledWarning(linked *gitworktree.Worktree, linkedColor *color.Color, main gitworktree.Worktree, mainWsPath string) string {
+	return fmt.Sprintf(
+		"worktree family disabled\n"+
+			"  reason     main worktree is uncolored, but linked has color\n"+
+			"  linked     %s  %s\n"+
+			"  main       %s  (no color)\n"+
+			"  hint       set main color first: ccws --color '%s' %s",
+		filepath.Base(linked.Path), linkedColor.Hex(),
+		main.Path,
+		linkedColor.Hex(), main.Path,
+	)
 }
