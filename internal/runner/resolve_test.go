@@ -269,3 +269,69 @@ func TestResolveColor_WorktreeCaseD_TargetOtherLinked(t *testing.T) {
 		t.Errorf("warns = %v, want a family-disabled notice", warns)
 	}
 }
+
+func TestResolveColor_WorktreeCaseB_MainTargetNoColor(t *testing.T) {
+	base := t.TempDir()
+	mainPath := filepath.Join(base, "myproj")
+	if err := os.MkdirAll(mainPath, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	withFakeWorktrees(t, []gitworktree.Worktree{
+		{Path: mainPath, GitDir: filepath.Join(mainPath, ".git"), IsMain: true},
+	}, nil)
+
+	_, src, warns, intent, err := ResolveColor(mainPath, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if src != SourceRandom {
+		t.Errorf("source = %v, want SourceRandom", src)
+	}
+	if intent != nil {
+		t.Errorf("intent = %v, want nil", intent)
+	}
+	if len(warns) != 0 {
+		t.Errorf("warns = %v, want empty (Case B is silent)", warns)
+	}
+}
+
+func TestResolveColor_WorktreeCaseC_LinkedFirst_ReturnsIntent(t *testing.T) {
+	base := t.TempDir()
+	mainPath := filepath.Join(base, "myproj")
+	linkedPath := filepath.Join(base, "myproj-feat-x")
+	if err := os.MkdirAll(mainPath, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(linkedPath, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	withFakeWorktrees(t, []gitworktree.Worktree{
+		{Path: mainPath, GitDir: filepath.Join(mainPath, ".git"), IsMain: true},
+		{Path: linkedPath, GitDir: filepath.Join(mainPath, ".git/worktrees/feat-x"), IsMain: false},
+	}, nil)
+
+	c, src, warns, intent, err := ResolveColor(linkedPath, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if src != SourceWorktree {
+		t.Errorf("source = %v, want SourceWorktree", src)
+	}
+	if intent == nil {
+		t.Fatal("intent = nil, want AnchorIntent")
+	}
+	wantWsPath := filepath.Join(base, "myproj.code-workspace")
+	if intent.WorkspacePath != wantWsPath {
+		t.Errorf("intent.WorkspacePath = %q, want %q", intent.WorkspacePath, wantWsPath)
+	}
+	// Linked color should be the anchor with a non-zero lightness offset
+	// (the linked worktree's IdentityHash is non-zero, so offset != 0).
+	if c == intent.AnchorColor {
+		t.Errorf("linked color = anchor; expected a lightness offset")
+	}
+	if len(warns) == 0 || !strings.Contains(warns[0], "family anchor created") {
+		t.Errorf("warns = %v, want anchor-created notice", warns)
+	}
+}

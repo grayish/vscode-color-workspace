@@ -156,8 +156,38 @@ func resolveFromWorktree(targetDir string) (color.Color, ColorSource, []string, 
 		return color.Color{}, 0, []string{warn}, nil, false, nil
 	}
 
-	// Cases B/C land in Task 9 — for now, fall through.
-	return color.Color{}, 0, nil, nil, false, nil
+	// Case B: main is target and has no color, no linked has color either —
+	// fall through to existing chain (settings.json → random). No warning.
+	if self.IsMain {
+		return color.Color{}, 0, nil, nil, false, nil
+	}
+
+	// Case C: target is linked, no other worktree has color — auto-establish
+	// main as the family anchor with a random color. The runner executes
+	// the side effect (writeAnchorWorkspace) using the returned AnchorIntent.
+	anchor := color.Random()
+	intent := &AnchorIntent{
+		WorkspacePath: mainWsPath,
+		AnchorColor:   anchor,
+	}
+	selfWsPath, err := workspaceFilePath(self.Path)
+	if err != nil {
+		return color.Color{}, 0, nil, nil, false, err
+	}
+	offset := color.LadderOffset(gitworktree.IdentityHash(*self))
+	derived := anchor.ApplyLightness(offset)
+	warn := formatAnchorCreatedWarning(mainWsPath, selfWsPath)
+	return derived, SourceWorktree, []string{warn}, intent, true, nil
+}
+
+func formatAnchorCreatedWarning(mainWsPath, selfWsPath string) string {
+	return fmt.Sprintf(
+		"family anchor created for main worktree\n"+
+			"  anchor at  %s\n"+
+			"  applied    %s\n"+
+			"  hint       run ccws on main worktree to claim color directly",
+		mainWsPath, selfWsPath,
+	)
 }
 
 // findLinkedWithColor returns the first non-main worktree (excluding self)
