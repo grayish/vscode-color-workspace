@@ -7,6 +7,8 @@ import (
 	"bufio"
 	"bytes"
 	"errors"
+	"hash/fnv"
+	"path/filepath"
 	"strings"
 )
 
@@ -63,4 +65,47 @@ func parsePorcelain(data []byte) ([]Worktree, error) {
 		return nil, err
 	}
 	return out, nil
+}
+
+// IdentityHash returns a stable 64-bit identifier for a worktree.
+// Main returns 0 by convention so it always maps to LadderOffset = 0.
+// Linked worktrees use FNV-1a over basename(GitDir) — git keeps that name
+// stable across `git worktree move` and branch renames.
+func IdentityHash(w Worktree) uint64 {
+	if w.IsMain {
+		return 0
+	}
+	name := filepath.Base(w.GitDir)
+	if name == "" || name == "." || name == "/" {
+		name = w.Path
+	}
+	h := fnv.New64a()
+	_, _ = h.Write([]byte(name))
+	sum := h.Sum64()
+	if sum == 0 {
+		return 1 // never collide with the main-worktree convention
+	}
+	return sum
+}
+
+// FindSelf returns the worktree whose Path equals targetDir or is an
+// ancestor of targetDir. Returns nil if no entry matches.
+func FindSelf(worktrees []Worktree, targetDir string) *Worktree {
+	abs, err := filepath.Abs(targetDir)
+	if err != nil {
+		return nil
+	}
+	var best *Worktree
+	for i := range worktrees {
+		w := &worktrees[i]
+		if w.Path == "" {
+			continue
+		}
+		if abs == w.Path || strings.HasPrefix(abs, w.Path+string(filepath.Separator)) {
+			if best == nil || len(w.Path) > len(best.Path) {
+				best = w
+			}
+		}
+	}
+	return best
 }

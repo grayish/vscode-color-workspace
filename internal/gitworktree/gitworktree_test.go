@@ -81,3 +81,59 @@ func TestParsePorcelain_Empty(t *testing.T) {
 		t.Errorf("len = %d, want 0", len(got))
 	}
 }
+
+func TestIdentityHash_MainReturnsZero(t *testing.T) {
+	w := Worktree{Path: "/tmp/myproj", GitDir: "/tmp/myproj/.git", IsMain: true}
+	if got := IdentityHash(w); got != 0 {
+		t.Errorf("IdentityHash(main) = %d, want 0", got)
+	}
+}
+
+func TestIdentityHash_LinkedStable(t *testing.T) {
+	w := Worktree{Path: "/tmp/myproj-feat-x", GitDir: "/tmp/myproj/.git/worktrees/feat-x"}
+	a := IdentityHash(w)
+	b := IdentityHash(w)
+	if a != b {
+		t.Errorf("IdentityHash not stable: %d vs %d", a, b)
+	}
+	if a == 0 {
+		t.Error("IdentityHash(linked) returned 0 (collision with main convention)")
+	}
+}
+
+func TestIdentityHash_DifferentLinkedDifferent(t *testing.T) {
+	a := IdentityHash(Worktree{GitDir: "/tmp/.git/worktrees/feat-x"})
+	b := IdentityHash(Worktree{GitDir: "/tmp/.git/worktrees/bugfix"})
+	if a == b {
+		t.Errorf("hashes collide: feat-x=%d bugfix=%d", a, b)
+	}
+}
+
+func TestFindSelf_ExactPath(t *testing.T) {
+	wts := []Worktree{
+		{Path: "/tmp/main", IsMain: true},
+		{Path: "/tmp/linked", IsMain: false},
+	}
+	got := FindSelf(wts, "/tmp/linked")
+	if got == nil || got.Path != "/tmp/linked" {
+		t.Errorf("FindSelf = %+v", got)
+	}
+}
+
+func TestFindSelf_Subdir(t *testing.T) {
+	wts := []Worktree{
+		{Path: "/tmp/main", IsMain: true},
+		{Path: "/tmp/linked", IsMain: false},
+	}
+	got := FindSelf(wts, "/tmp/linked/sub/dir")
+	if got == nil || got.Path != "/tmp/linked" {
+		t.Errorf("FindSelf(subdir) = %+v", got)
+	}
+}
+
+func TestFindSelf_NoMatch(t *testing.T) {
+	wts := []Worktree{{Path: "/tmp/main", IsMain: true}}
+	if got := FindSelf(wts, "/elsewhere"); got != nil {
+		t.Errorf("FindSelf(unrelated) = %+v, want nil", got)
+	}
+}
