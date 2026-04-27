@@ -3,11 +3,13 @@ package runner
 import (
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 
 	"github.com/sang-bin/vscode-color-workspace/internal/color"
 	"github.com/sang-bin/vscode-color-workspace/internal/gitworktree"
 	"github.com/sang-bin/vscode-color-workspace/internal/vscodesettings"
+	"github.com/sang-bin/vscode-color-workspace/internal/workspace"
 )
 
 // ColorSource indicates where the final color came from.
@@ -75,6 +77,38 @@ func ResolveColor(targetDir, flag string) (color.Color, ColorSource, []string, *
 		}
 	}
 	return color.Random(), SourceRandom, warns, nil, nil
+}
+
+// readWorkspacePeacockColor parses the workspace file at path and returns
+// the peacock.color setting. Returns (nil, nil) when:
+//   - file does not exist
+//   - file has no settings block
+//   - settings has no peacock.color key
+//   - peacock.color is not a parseable color (treated as missing)
+func readWorkspacePeacockColor(path string) (*color.Color, error) {
+	if _, err := os.Stat(path); errors.Is(err, os.ErrNotExist) {
+		return nil, nil
+	}
+	ws, err := workspace.Read(path)
+	if err != nil {
+		return nil, err
+	}
+	if ws == nil || ws.Settings == nil {
+		return nil, nil
+	}
+	raw, ok := ws.Settings["peacock.color"]
+	if !ok {
+		return nil, nil
+	}
+	hex, ok := raw.(string)
+	if !ok {
+		return nil, nil
+	}
+	c, err := color.Parse(hex)
+	if err != nil {
+		return nil, nil
+	}
+	return &c, nil
 }
 
 // resolveFromWorktree consults the worktree context. Return tuple semantics:
