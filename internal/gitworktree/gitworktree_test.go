@@ -1,6 +1,8 @@
 package gitworktree
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -135,5 +137,30 @@ func TestFindSelf_NoMatch(t *testing.T) {
 	wts := []Worktree{{Path: "/tmp/main", IsMain: true}}
 	if got := FindSelf(wts, "/elsewhere"); got != nil {
 		t.Errorf("FindSelf(unrelated) = %+v, want nil", got)
+	}
+}
+
+func TestFindSelf_ResolvesSymlinks(t *testing.T) {
+	// Simulate macOS-style /var → /private/var: create a real dir,
+	// then a symlink that points to it. FindSelf should match a worktree
+	// whose Path is the resolved (canonical) form when the targetDir
+	// goes through the symlinked form.
+	base := t.TempDir()
+	canonical := filepath.Join(base, "canonical")
+	if err := os.MkdirAll(canonical, 0755); err != nil {
+		t.Fatal(err)
+	}
+	link := filepath.Join(base, "via-symlink")
+	if err := os.Symlink(canonical, link); err != nil {
+		t.Skipf("symlink not supported: %v", err)
+	}
+
+	wts := []Worktree{{Path: canonical, IsMain: true}}
+	got := FindSelf(wts, link)
+	if got == nil {
+		t.Fatal("FindSelf returned nil; expected match via symlink resolution")
+	}
+	if got.Path != canonical {
+		t.Errorf("FindSelf.Path = %q, want %q", got.Path, canonical)
 	}
 }

@@ -92,11 +92,16 @@ func IdentityHash(w Worktree) uint64 {
 }
 
 // FindSelf returns the worktree whose Path equals targetDir or is an
-// ancestor of targetDir. Returns nil if no entry matches.
+// ancestor of targetDir. Symlinks on either side (target or worktree path)
+// are resolved before comparison so that, e.g., macOS's /var → /private/var
+// pairing still produces a match. Returns nil if no entry matches.
 func FindSelf(worktrees []Worktree, targetDir string) *Worktree {
 	abs, err := filepath.Abs(targetDir)
 	if err != nil {
 		return nil
+	}
+	if resolved, err := filepath.EvalSymlinks(abs); err == nil {
+		abs = resolved
 	}
 	var best *Worktree
 	for i := range worktrees {
@@ -104,8 +109,12 @@ func FindSelf(worktrees []Worktree, targetDir string) *Worktree {
 		if w.Path == "" {
 			continue
 		}
-		if abs == w.Path || strings.HasPrefix(abs, w.Path+string(filepath.Separator)) {
-			if best == nil || len(w.Path) > len(best.Path) {
+		wPath := w.Path
+		if resolved, err := filepath.EvalSymlinks(wPath); err == nil {
+			wPath = resolved
+		}
+		if abs == wPath || strings.HasPrefix(abs, wPath+string(filepath.Separator)) {
+			if best == nil || len(wPath) > len(best.Path) {
 				best = w
 			}
 		}
