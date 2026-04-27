@@ -142,6 +142,13 @@ func TestRenderPreconfigured_PlainOutput(t *testing.T) {
 	}
 }
 
+func TestSourceLabel_Worktree(t *testing.T) {
+	got := sourceLabel(runner.SourceWorktree)
+	if got != "from worktree family" {
+		t.Errorf("sourceLabel(SourceWorktree) = %q, want %q", got, "from worktree family")
+	}
+}
+
 func TestRenderPreconfigured_NoColorEnv(t *testing.T) {
 	t.Setenv("NO_COLOR", "1")
 

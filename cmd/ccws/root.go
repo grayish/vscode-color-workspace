@@ -78,6 +78,8 @@ func sourceLabel(s runner.ColorSource) string {
 		return "from --color"
 	case runner.SourceSettings:
 		return "inherited from .vscode/settings.json"
+	case runner.SourceWorktree:
+		return "from worktree family"
 	case runner.SourceRandom:
 		return "random"
 	default:
