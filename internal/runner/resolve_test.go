@@ -10,7 +10,7 @@ import (
 func TestResolveColor_ExplicitWins(t *testing.T) {
 	dir := t.TempDir()
 	writeSettings(t, dir, `{"peacock.color": "#111111"}`)
-	got, src, err := ResolveColor(dir, "#222222")
+	got, src, _, _, err := ResolveColor(dir, "#222222")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -25,7 +25,7 @@ func TestResolveColor_ExplicitWins(t *testing.T) {
 func TestResolveColor_InheritFromSettings(t *testing.T) {
 	dir := t.TempDir()
 	writeSettings(t, dir, `{"peacock.color": "#5a3b8c"}`)
-	got, src, err := ResolveColor(dir, "")
+	got, src, _, _, err := ResolveColor(dir, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -39,7 +39,7 @@ func TestResolveColor_InheritFromSettings(t *testing.T) {
 
 func TestResolveColor_Random(t *testing.T) {
 	dir := t.TempDir()
-	got, src, err := ResolveColor(dir, "")
+	got, src, _, _, err := ResolveColor(dir, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -53,7 +53,7 @@ func TestResolveColor_Random(t *testing.T) {
 
 func TestResolveColor_InvalidFlag(t *testing.T) {
 	dir := t.TempDir()
-	if _, _, err := ResolveColor(dir, "not-a-color"); err == nil {
+	if _, _, _, _, err := ResolveColor(dir, "not-a-color"); err == nil {
 		t.Error("expected error for bad input")
 	}
 }

@@ -98,10 +98,11 @@ func (r *Runner) Run(opts Options) (*Result, error) {
 		}
 	}
 
-	c, src, err := ResolveColor(abs, opts.ColorInput)
+	c, src, resolveWarns, anchorIntent, err := ResolveColor(abs, opts.ColorInput)
 	if err != nil {
 		return nil, err
 	}
+	_ = anchorIntent // wired in Task 10
 
 	settingsPath := filepath.Join(abs, ".vscode", "settings.json")
 	srcSettings, err := vscodesettings.Read(settingsPath)
@@ -137,7 +138,7 @@ func (r *Runner) Run(opts Options) (*Result, error) {
 		}
 	}
 
-	var warnings []string
+	warnings := append([]string(nil), resolveWarns...)
 	if isGitRepo(parent) {
 		warnings = append(warnings,
 			fmt.Sprintf("parent directory %s is a git repository; workspace file may be committed", parent))
