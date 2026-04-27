@@ -54,12 +54,12 @@ Peacock-equivalent color palette, migrates existing peacock settings from
 			if err != nil {
 				return err
 			}
+			renderWarnings(tui.NewStderr(), res.Warnings)
 			if res.Preconfigured {
 				renderPreconfigured(tui.NewStderr(), res)
 			} else {
 				renderSuccess(tui.NewStdout(), res, sourceLabel(res.ColorSource))
 			}
-			renderWarnings(tui.NewStderr(), res.Warnings)
 			return nil
 		},
 	}
