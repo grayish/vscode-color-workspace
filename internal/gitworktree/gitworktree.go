@@ -163,9 +163,11 @@ func readGitDirPointer(path string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	for _, line := range strings.Split(string(data), "\n") {
-		if strings.HasPrefix(line, "gitdir:") {
-			return strings.TrimSpace(strings.TrimPrefix(line, "gitdir:")), nil
+	for rest := string(data); rest != ""; {
+		var line string
+		line, rest, _ = strings.Cut(rest, "\n")
+		if after, ok := strings.CutPrefix(line, "gitdir:"); ok {
+			return strings.TrimSpace(after), nil
 		}
 	}
 	return "", fmt.Errorf("no gitdir: line in %q", path)

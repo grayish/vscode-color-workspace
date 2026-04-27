@@ -3,7 +3,6 @@ package runner
 import (
 	"errors"
 	"fmt"
-	"os"
 	"path/filepath"
 
 	"github.com/sang-bin/vscode-color-workspace/internal/color"
@@ -34,6 +33,7 @@ type AnchorIntent struct {
 
 // listWorktreesFn is the package-level injection point for the gitworktree.List
 // dependency. Tests reassign it (with cleanup) to inject fixture worktree slices.
+// Tests that reassign this var must not call t.Parallel().
 var listWorktreesFn = gitworktree.List
 
 // ResolveColor applies the priority rules:
@@ -86,21 +86,11 @@ func ResolveColor(targetDir, flag string) (color.Color, ColorSource, []string, *
 //   - settings has no peacock.color key
 //   - peacock.color is not a parseable color (treated as missing)
 func readWorkspacePeacockColor(path string) (*color.Color, error) {
-	if _, err := os.Stat(path); errors.Is(err, os.ErrNotExist) {
-		return nil, nil
-	}
 	ws, err := workspace.Read(path)
 	if err != nil {
 		return nil, err
 	}
-	if ws == nil || ws.Settings == nil {
-		return nil, nil
-	}
-	raw, ok := ws.Settings["peacock.color"]
-	if !ok {
-		return nil, nil
-	}
-	hex, ok := raw.(string)
+	hex, ok := ws.PeacockColor()
 	if !ok {
 		return nil, nil
 	}

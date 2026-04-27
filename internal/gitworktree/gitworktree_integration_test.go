@@ -3,6 +3,7 @@
 package gitworktree
 
 import (
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -97,24 +98,7 @@ func TestList_NotInRepo(t *testing.T) {
 	if err == nil {
 		t.Fatal("List(non-git dir) returned nil error")
 	}
-	if !errorsIsErrNotInWorktree(err) {
+	if !errors.Is(err, ErrNotInWorktree) {
 		t.Errorf("err = %v, want ErrNotInWorktree", err)
 	}
-}
-
-func errorsIsErrNotInWorktree(err error) bool {
-	for ; err != nil; err = unwrap(err) {
-		if err == ErrNotInWorktree {
-			return true
-		}
-	}
-	return false
-}
-
-func unwrap(err error) error {
-	type unwrapper interface{ Unwrap() error }
-	if u, ok := err.(unwrapper); ok {
-		return u.Unwrap()
-	}
-	return nil
 }

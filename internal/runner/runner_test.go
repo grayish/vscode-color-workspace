@@ -355,14 +355,10 @@ func TestRun_WorktreeCaseC_WritesMainAnchor(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	orig := listWorktreesFn
-	t.Cleanup(func() { listWorktreesFn = orig })
-	listWorktreesFn = func(string) ([]gitworktree.Worktree, error) {
-		return []gitworktree.Worktree{
-			{Path: mainPath, GitDir: filepath.Join(mainPath, ".git"), IsMain: true},
-			{Path: linkedPath, GitDir: filepath.Join(mainPath, ".git/worktrees/feat-x"), IsMain: false},
-		}, nil
-	}
+	withFakeWorktrees(t, []gitworktree.Worktree{
+		{Path: mainPath, GitDir: filepath.Join(mainPath, ".git"), IsMain: true},
+		{Path: linkedPath, GitDir: filepath.Join(mainPath, ".git/worktrees/feat-x"), IsMain: false},
+	}, nil)
 
 	opts := Defaults()
 	opts.TargetDir = linkedPath
