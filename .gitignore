@@ -6,3 +6,5 @@
 /scripts/gen-peacock-fixture/node_modules/
 /.task/
 /.claude/
+/.superpowers/
+/.worktrees/

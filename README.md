@@ -43,6 +43,17 @@ Running `ccws` in `/home/me/code/myproj` will:
 4. Clean up `peacock.*` keys and the peacock-managed subset of `workbench.colorCustomizations` from `/home/me/code/myproj/.vscode/settings.json`. If the settings file becomes empty it's deleted, along with an empty `.vscode/` directory.
 5. Launch `code <workspace-file>`.
 
+## Worktree color family
+
+When you run `ccws` inside a git worktree, it automatically picks a "family" color so sibling worktrees of the same repo look related but distinct (same hue/saturation, lightness shifted by ±5/±10/±15%).
+
+- First `ccws` on the main worktree: random color, becomes the family anchor.
+- First `ccws` on a linked worktree (main not yet colored): a random anchor is written to the main worktree's `.code-workspace` automatically, and the linked worktree gets a derived color. A warning is printed to stderr.
+- If linked worktrees already have colors but main does not, ccws assumes you set them deliberately, prints a warning, and disables family logic for that run.
+- Pass `--color` to bypass family logic.
+
+The worktree identity is stable across branch renames and `git worktree move` (it uses the name git assigns under `.git/worktrees/<name>`).
+
 ## Safety guards
 
 - **Guard 1 (soft) — existing peacock keys in the workspace file.** ccws prints a warning, opens the workspace as-is, and exits 0. `.vscode/settings.json` is not touched on this path. Pass `--force` to overwrite (this also re-runs cleanup against `.vscode/settings.json`).

@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 
 	"github.com/sang-bin/vscode-color-workspace/internal/jsonc"
+	"github.com/sang-bin/vscode-color-workspace/internal/peacock"
 )
 
 // Folder is an entry in the top-level "folders" array.
@@ -30,6 +31,20 @@ type Workspace struct {
 	Launch     map[string]any `json:"launch,omitempty"`
 	Tasks      map[string]any `json:"tasks,omitempty"`
 	Other      map[string]any `json:"-"`
+}
+
+// PeacockColor returns the peacock.color setting if present and stored as a
+// string. Returns ("", false) when the workspace is nil, has no settings, or
+// the key is missing/wrong type.
+func (ws *Workspace) PeacockColor() (string, bool) {
+	if ws == nil || ws.Settings == nil {
+		return "", false
+	}
+	s, ok := ws.Settings[peacock.SettingColor].(string)
+	if !ok {
+		return "", false
+	}
+	return s, true
 }
 
 // Read parses the file at path. Returns (nil, nil) if the file does not exist.
