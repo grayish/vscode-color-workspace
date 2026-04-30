@@ -11,6 +11,7 @@ type Options struct {
 	NoOpen     bool
 	Force      bool
 	KeepSource bool
+	Debug      bool // when true, the runner writes [debug] lines to stderr
 	Palette    color.Options
 }
 

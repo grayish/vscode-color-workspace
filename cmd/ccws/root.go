@@ -30,6 +30,7 @@ func rootCmd() *cobra.Command {
 		flagColor  string
 		flagNoOpen bool
 		flagForce  bool
+		flagDebug  bool
 	)
 
 	cmd := &cobra.Command{
@@ -50,16 +51,17 @@ Peacock-equivalent color palette, migrates existing peacock settings from
 			opts.ColorInput = flagColor
 			opts.NoOpen = flagNoOpen
 			opts.Force = flagForce
+			opts.Debug = flagDebug
 			res, err := runner.New(nil).Run(opts)
 			if err != nil {
 				return err
 			}
+			renderWarnings(tui.NewStderr(), res.Warnings)
 			if res.Preconfigured {
 				renderPreconfigured(tui.NewStderr(), res)
 			} else {
 				renderSuccess(tui.NewStdout(), res, sourceLabel(res.ColorSource))
 			}
-			renderWarnings(tui.NewStderr(), res.Warnings)
 			return nil
 		},
 	}
@@ -67,6 +69,7 @@ Peacock-equivalent color palette, migrates existing peacock settings from
 	cmd.Flags().StringVar(&flagColor, "color", "", "Color: #RRGGBB, #RGB, CSS name, or 'random'")
 	cmd.Flags().BoolVar(&flagNoOpen, "no-open", false, "Do not open with the code CLI after creating")
 	cmd.Flags().BoolVar(&flagForce, "force", false, "Bypass safety guards")
+	cmd.Flags().BoolVar(&flagDebug, "debug", false, "Write [debug] branch tracing to stderr")
 
 	cmd.AddCommand(interactiveCmd())
 	return cmd
@@ -78,6 +81,8 @@ func sourceLabel(s runner.ColorSource) string {
 		return "from --color"
 	case runner.SourceSettings:
 		return "inherited from .vscode/settings.json"
+	case runner.SourceWorktree:
+		return "from worktree family"
 	case runner.SourceRandom:
 		return "random"
 	default:

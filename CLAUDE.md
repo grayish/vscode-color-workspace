@@ -5,14 +5,15 @@ Go CLI that replaces Peacock VSCode extension by writing colors to `<parent>/<fo
 ## Commands — use Taskfile, not raw `go`
 
 ```bash
-task            # test
-task build      # → ./ccws
-task install    # → $GOBIN/ccws
-task test:race  # race detector
-task lint       # vet + gofmt check (CI runs this)
-task ci         # lint + test:race
-task fixture    # regenerate golden fixture (needs Node)
-task --list     # full target list
+task                  # test
+task build            # → ./ccws
+task install          # → $GOBIN/ccws
+task test:race        # race detector
+task test:integration # gitworktree integration tests (needs git on PATH)
+task lint             # vet + gofmt check (CI runs this)
+task ci               # lint + test:race
+task fixture          # regenerate golden fixture (needs Node)
+task --list           # full target list
 ```
 
 Always run `task lint` before committing — past sessions have landed gofmt-dirty code because subagents skipped formatting.
@@ -53,12 +54,13 @@ color → (stdlib only)
 peacock → (stdlib only)
 jsonc → hujson
 tui → lipgloss, isatty, termenv
+gitworktree → (stdlib only)
 workspace, vscodesettings → peacock, jsonc
-runner → color, workspace, vscodesettings
+runner → color, workspace, vscodesettings, gitworktree
 interactive → runner, vscodesettings
 cmd/ccws → runner, interactive, tui
 ```
 
 ## Non-goals (don't add these without design discussion)
 
-Peacock favorites, `peacock.remoteColor` / Live Share, multi-root workspaces, VSCode Profiles integration, `.code-workspace` comment preservation on rewrite, uninstall subcommand.
+Peacock favorites, `peacock.remoteColor` / Live Share, multi-root workspaces, VSCode Profiles integration, `.code-workspace` comment preservation on rewrite, uninstall subcommand, similar-color across non-worktree clones of the same repo, user-tunable hash-to-offset mapping.

@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/sang-bin/vscode-color-workspace/internal/color"
 	"github.com/sang-bin/vscode-color-workspace/internal/vscodesettings"
@@ -98,9 +99,14 @@ func (r *Runner) Run(opts Options) (*Result, error) {
 		}
 	}
 
-	c, src, err := ResolveColor(abs, opts.ColorInput)
+	c, src, resolveWarns, anchorIntent, err := ResolveColor(abs, opts.ColorInput, opts.Debug)
 	if err != nil {
 		return nil, err
+	}
+	if anchorIntent != nil {
+		if err := writeAnchorWorkspace(anchorIntent, opts); err != nil {
+			return nil, fmt.Errorf("write main anchor workspace: %w", err)
+		}
 	}
 
 	settingsPath := filepath.Join(abs, ".vscode", "settings.json")
@@ -137,7 +143,7 @@ func (r *Runner) Run(opts Options) (*Result, error) {
 		}
 	}
 
-	var warnings []string
+	warnings := append([]string(nil), resolveWarns...)
 	if isGitRepo(parent) {
 		warnings = append(warnings,
 			fmt.Sprintf("parent directory %s is a git repository; workspace file may be committed", parent))
@@ -201,4 +207,23 @@ func workspaceFilePath(target string) (string, error) {
 func isGitRepo(dir string) bool {
 	_, err := os.Stat(filepath.Join(dir, ".git"))
 	return err == nil
+}
+
+// writeAnchorWorkspace materialises an AnchorIntent: read or create the main
+// worktree's .code-workspace, merge in the peacock palette derived from the
+// anchor color, and write it back. Does NOT touch main's .vscode/settings.json
+// — that side effect would be invasive on a directory the user did not target.
+func writeAnchorWorkspace(intent *AnchorIntent, opts Options) error {
+	ws, err := workspace.Read(intent.WorkspacePath)
+	if err != nil {
+		return err
+	}
+	if ws == nil {
+		ws = &workspace.Workspace{}
+	}
+	folderName := strings.TrimSuffix(filepath.Base(intent.WorkspacePath), ".code-workspace")
+	workspace.EnsureFolder(ws, "./"+folderName)
+	palette := color.Palette(intent.AnchorColor, opts.Palette)
+	workspace.ApplyPeacock(ws, intent.AnchorColor.Hex(), palette)
+	return workspace.Write(intent.WorkspacePath, ws)
 }

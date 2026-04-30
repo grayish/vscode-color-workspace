@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/sang-bin/vscode-color-workspace/internal/runner"
 	"github.com/sang-bin/vscode-color-workspace/internal/tui"
@@ -64,7 +65,15 @@ func renderWarnings(w *tui.Writer, warnings []string) {
 		if i > 0 {
 			w.Newline()
 		}
-		w.Warn(msg)
+		lines := strings.Split(msg, "\n")
+		w.Warn(lines[0])
+		if len(lines) > 1 {
+			details := make([]tui.Detail, 0, len(lines)-1)
+			for _, line := range lines[1:] {
+				details = append(details, tui.Detail{Label: strings.TrimLeft(line, " ")})
+			}
+			w.Details(details)
+		}
 	}
 }
 

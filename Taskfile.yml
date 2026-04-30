@@ -50,6 +50,11 @@ tasks:
       - go test -coverprofile=coverage.out ./...
       - go tool cover -func=coverage.out
 
+  test:integration:
+    desc: Run integration tests (requires git on PATH)
+    cmds:
+      - go test -tags=integration -count=1 ./...
+
   vet:
     desc: Run go vet
     cmds:

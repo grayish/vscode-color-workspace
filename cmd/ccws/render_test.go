@@ -142,6 +142,29 @@ func TestRenderPreconfigured_PlainOutput(t *testing.T) {
 	}
 }
 
+func TestSourceLabel_Worktree(t *testing.T) {
+	got := sourceLabel(runner.SourceWorktree)
+	if got != "from worktree family" {
+		t.Errorf("sourceLabel(SourceWorktree) = %q, want %q", got, "from worktree family")
+	}
+}
+
+func TestRenderWarnings_MultiLine(t *testing.T) {
+	var buf bytes.Buffer
+	w := tui.NewWriter(&buf, false)
+	msg := "worktree family disabled\n" +
+		"  linked     myproj-feat-x  #4a8b5c\n" +
+		"  main       /path/myproj  (no color)"
+	renderWarnings(w, []string{msg})
+	got := buf.String()
+	want := "  warn   worktree family disabled\n" +
+		"         linked     myproj-feat-x  #4a8b5c\n" +
+		"         main       /path/myproj  (no color)\n"
+	if got != want {
+		t.Errorf("renderWarnings multi-line:\ngot:  %q\nwant: %q", got, want)
+	}
+}
+
 func TestRenderPreconfigured_NoColorEnv(t *testing.T) {
 	t.Setenv("NO_COLOR", "1")
 
