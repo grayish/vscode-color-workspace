@@ -13,6 +13,18 @@ import (
 	"github.com/sang-bin/vscode-color-workspace/internal/workspace"
 )
 
+// ErrPartialPropagation is returned by Run when A2 family propagation
+// completed with one or more linked write failures. The accompanying
+// *Result is populated; the caller should render Result.Warnings, then
+// surface this error to set exit code 1.
+var ErrPartialPropagation = errors.New("runner: family propagation had failures")
+
+// PropagateResult carries the outcome of writeFamilyPropagation.
+type PropagateResult struct {
+	Applied []string
+	Failed  []PropagateFailure
+}
+
 // GuardError indicates a safety guard triggered. Exit code 2.
 // Carries data only; presentation is the CLI layer's responsibility.
 type GuardError struct {
@@ -36,6 +48,9 @@ type Result struct {
 	Preconfigured   bool     // true when ws already had peacock keys and Force=false; nothing was written
 	PeacockKeys     []string // existing peacock keys detected on Preconfigured short-circuit (sorted, dotted paths)
 	Warnings        []string
+	PropagatedTo    []string           // A2: linked ws paths written successfully
+	SkippedLinked   []SkippedLinked    // A2: linked ws paths skipped (with reason)
+	FailedLinked    []PropagateFailure // A2: linked ws paths where write failed
 }
 
 // Runner orchestrates the full flow.
@@ -99,14 +114,29 @@ func (r *Runner) Run(opts Options) (*Result, error) {
 		}
 	}
 
-	c, src, resolveWarns, anchorIntent, err := ResolveColor(abs, opts.ColorInput, opts.Debug)
+	c, src, resolveWarns, anchorIntent, propagateIntent, err := ResolveColor(abs, opts.ColorInput, opts.Force, opts.Debug)
 	if err != nil {
 		return nil, err
 	}
 	if anchorIntent != nil {
-		if err := writeAnchorWorkspace(anchorIntent, opts); err != nil {
+		if err := writeOneWorkspace(anchorIntent.WorkspacePath, anchorIntent.AnchorColor, opts); err != nil {
 			return nil, fmt.Errorf("write main anchor workspace: %w", err)
 		}
+	}
+
+	var (
+		propagatedTo  []string
+		skippedLinked []SkippedLinked
+		failedLinked  []PropagateFailure
+	)
+	if propagateIntent != nil {
+		pres, perr := writeFamilyPropagation(propagateIntent, opts)
+		if perr != nil {
+			return nil, perr
+		}
+		propagatedTo = pres.Applied
+		skippedLinked = propagateIntent.Skipped
+		failedLinked = pres.Failed
 	}
 
 	settingsPath := filepath.Join(abs, ".vscode", "settings.json")
@@ -124,13 +154,18 @@ func (r *Runner) Run(opts Options) (*Result, error) {
 	palette := color.Palette(c, opts.Palette)
 	colorHex := c.Hex()
 
-	if ws == nil {
-		ws = &workspace.Workspace{}
-	}
-	workspace.EnsureFolder(ws, "./"+folderName)
-	workspace.ApplyPeacock(ws, colorHex, palette)
-	if err := workspace.Write(wsPath, ws); err != nil {
-		return nil, err
+	// When propagateIntent is non-nil (A2), writeFamilyPropagation has
+	// already written main's .code-workspace via intent.AnchorPath, which
+	// equals wsPath. Skip this block to avoid a redundant second write.
+	if propagateIntent == nil {
+		if ws == nil {
+			ws = &workspace.Workspace{}
+		}
+		workspace.EnsureFolder(ws, "./"+folderName)
+		workspace.ApplyPeacock(ws, colorHex, palette)
+		if err := workspace.Write(wsPath, ws); err != nil {
+			return nil, err
+		}
 	}
 
 	cleaned := false
@@ -148,6 +183,9 @@ func (r *Runner) Run(opts Options) (*Result, error) {
 		warnings = append(warnings,
 			fmt.Sprintf("parent directory %s is a git repository; workspace file may be committed", parent))
 	}
+	if propagateIntent != nil {
+		warnings = append(warnings, formatPropagatedWarning(propagateIntent, failedLinked))
+	}
 
 	if !opts.NoOpen {
 		if err := r.Opener.Open(wsPath); err != nil {
@@ -159,13 +197,23 @@ func (r *Runner) Run(opts Options) (*Result, error) {
 		}
 	}
 
-	return &Result{
+	result := &Result{
 		WorkspaceFile:   wsPath,
 		ColorHex:        colorHex,
 		ColorSource:     src,
 		SettingsCleaned: cleaned,
 		Warnings:        warnings,
-	}, nil
+		PropagatedTo:    propagatedTo,
+		SkippedLinked:   skippedLinked,
+		FailedLinked:    failedLinked,
+	}
+	// Partial-propagation pattern: return populated Result with
+	// ErrPartialPropagation sentinel so the CLI can render warnings
+	// before mapping the error to exit 1. See ErrPartialPropagation doc.
+	if len(failedLinked) > 0 {
+		return result, ErrPartialPropagation
+	}
+	return result, nil
 }
 
 // CheckPreconfigured reports whether target/<...>.code-workspace already
@@ -209,21 +257,44 @@ func isGitRepo(dir string) bool {
 	return err == nil
 }
 
-// writeAnchorWorkspace materialises an AnchorIntent: read or create the main
-// worktree's .code-workspace, merge in the peacock palette derived from the
-// anchor color, and write it back. Does NOT touch main's .vscode/settings.json
-// — that side effect would be invasive on a directory the user did not target.
-func writeAnchorWorkspace(intent *AnchorIntent, opts Options) error {
-	ws, err := workspace.Read(intent.WorkspacePath)
+// writeFamilyPropagation executes the writes described by a PropagateIntent.
+// Main is written first; if that fails the function returns a hard error
+// without attempting any linked writes. Otherwise, every linked target is
+// attempted; failures are collected into PropagateResult.Failed and do not
+// abort the loop.
+func writeFamilyPropagation(intent *PropagateIntent, opts Options) (PropagateResult, error) {
+	if err := writeOneWorkspace(intent.AnchorPath, intent.AnchorColor, opts); err != nil {
+		return PropagateResult{}, fmt.Errorf("write main anchor workspace: %w", err)
+	}
+	var res PropagateResult
+	for _, tgt := range intent.Targets {
+		if err := writeOneWorkspace(tgt.WorkspacePath, tgt.DerivedColor, opts); err != nil {
+			res.Failed = append(res.Failed, PropagateFailure{
+				WorkspacePath: tgt.WorkspacePath,
+				Err:           err,
+			})
+			continue
+		}
+		res.Applied = append(res.Applied, tgt.WorkspacePath)
+	}
+	return res, nil
+}
+
+// writeOneWorkspace reads (or creates) the workspace at path, applies the
+// peacock palette derived from c, and writes it back. Used for Case C anchor
+// auto-creation and for A2 family propagation; does NOT touch the worktree's
+// .vscode/settings.json (invasive on a directory the user did not target).
+func writeOneWorkspace(path string, c color.Color, opts Options) error {
+	ws, err := workspace.Read(path)
 	if err != nil {
 		return err
 	}
 	if ws == nil {
 		ws = &workspace.Workspace{}
 	}
-	folderName := strings.TrimSuffix(filepath.Base(intent.WorkspacePath), ".code-workspace")
+	folderName := strings.TrimSuffix(filepath.Base(path), ".code-workspace")
 	workspace.EnsureFolder(ws, "./"+folderName)
-	palette := color.Palette(intent.AnchorColor, opts.Palette)
-	workspace.ApplyPeacock(ws, intent.AnchorColor.Hex(), palette)
-	return workspace.Write(intent.WorkspacePath, ws)
+	palette := color.Palette(c, opts.Palette)
+	workspace.ApplyPeacock(ws, c.Hex(), palette)
+	return workspace.Write(path, ws)
 }

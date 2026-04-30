@@ -53,7 +53,8 @@ Peacock-equivalent color palette, migrates existing peacock settings from
 			opts.Force = flagForce
 			opts.Debug = flagDebug
 			res, err := runner.New(nil).Run(opts)
-			if err != nil {
+			// ErrPartialPropagation is recoverable for rendering — the result is populated.
+			if err != nil && !errors.Is(err, runner.ErrPartialPropagation) {
 				return err
 			}
 			renderWarnings(tui.NewStderr(), res.Warnings)
@@ -62,7 +63,7 @@ Peacock-equivalent color palette, migrates existing peacock settings from
 			} else {
 				renderSuccess(tui.NewStdout(), res, sourceLabel(res.ColorSource))
 			}
-			return nil
+			return err // propagates ErrPartialPropagation to errToExit → exit 1
 		},
 	}
 

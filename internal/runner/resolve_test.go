@@ -1,6 +1,7 @@
 package runner
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -14,7 +15,7 @@ import (
 func TestResolveColor_ExplicitWins(t *testing.T) {
 	dir := t.TempDir()
 	writeSettings(t, dir, `{"peacock.color": "#111111"}`)
-	got, src, _, _, err := ResolveColor(dir, "#222222", false)
+	got, src, _, _, _, err := ResolveColor(dir, "#222222", false, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -29,7 +30,7 @@ func TestResolveColor_ExplicitWins(t *testing.T) {
 func TestResolveColor_InheritFromSettings(t *testing.T) {
 	dir := t.TempDir()
 	writeSettings(t, dir, `{"peacock.color": "#5a3b8c"}`)
-	got, src, _, _, err := ResolveColor(dir, "", false)
+	got, src, _, _, _, err := ResolveColor(dir, "", false, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -43,7 +44,7 @@ func TestResolveColor_InheritFromSettings(t *testing.T) {
 
 func TestResolveColor_Random(t *testing.T) {
 	dir := t.TempDir()
-	got, src, _, _, err := ResolveColor(dir, "", false)
+	got, src, _, _, _, err := ResolveColor(dir, "", false, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -57,7 +58,7 @@ func TestResolveColor_Random(t *testing.T) {
 
 func TestResolveColor_InvalidFlag(t *testing.T) {
 	dir := t.TempDir()
-	if _, _, _, _, err := ResolveColor(dir, "not-a-color", false); err == nil {
+	if _, _, _, _, _, err := ResolveColor(dir, "not-a-color", false, false); err == nil {
 		t.Error("expected error for bad input")
 	}
 }
@@ -156,7 +157,7 @@ func TestResolveColor_WorktreeCaseA_LinkedTarget(t *testing.T) {
 		{Path: linkedPath, GitDir: filepath.Join(mainPath, ".git/worktrees/feat-x"), IsMain: false},
 	}, nil)
 
-	c, src, _, intent, err := ResolveColor(linkedPath, "", false)
+	c, src, _, intent, _, err := ResolveColor(linkedPath, "", false, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -173,7 +174,7 @@ func TestResolveColor_WorktreeCaseA_LinkedTarget(t *testing.T) {
 	}
 }
 
-func TestResolveColor_WorktreeCaseA_MainTarget(t *testing.T) {
+func TestResolveColor_A1_SingleWorktreeMain_FallsThrough(t *testing.T) {
 	base := t.TempDir()
 	mainPath := filepath.Join(base, "myproj")
 	if err := os.MkdirAll(mainPath, 0755); err != nil {
@@ -185,16 +186,20 @@ func TestResolveColor_WorktreeCaseA_MainTarget(t *testing.T) {
 		{Path: mainPath, GitDir: filepath.Join(mainPath, ".git"), IsMain: true},
 	}, nil)
 
-	c, src, _, _, err := ResolveColor(mainPath, "", false)
+	c, src, _, _, _, err := ResolveColor(mainPath, "", true, false)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if src != SourceWorktree {
-		t.Errorf("source = %v, want SourceWorktree", src)
+	// Single-worktree main with --force should NOT enter Case A. With no
+	// settings.json peacock.color present, expect SourceRandom.
+	if src != SourceRandom {
+		t.Errorf("source = %v, want SourceRandom (A1 fall-through)", src)
 	}
-	want := color.Color{R: 0x5a, G: 0x3b, B: 0x8c}
-	if c != want {
-		t.Errorf("main color = %v, want %v (offset 0)", c, want)
+	// The random color must not match the existing main color (overwhelmingly
+	// unlikely; if it does, the test re-runs will catch any structural error).
+	original := color.Color{R: 0x5a, G: 0x3b, B: 0x8c}
+	if c == original {
+		t.Errorf("got same color as existing main color (%v); A1 should regenerate", c)
 	}
 }
 
@@ -216,7 +221,7 @@ func TestResolveColor_WorktreeCaseD_TargetMain(t *testing.T) {
 		{Path: linkedPath, GitDir: filepath.Join(mainPath, ".git/worktrees/feat-x"), IsMain: false},
 	}, nil)
 
-	_, src, warns, intent, err := ResolveColor(mainPath, "", false)
+	_, src, warns, intent, _, err := ResolveColor(mainPath, "", false, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -255,7 +260,7 @@ func TestResolveColor_WorktreeCaseD_TargetOtherLinked(t *testing.T) {
 		{Path: linkedBPath, GitDir: filepath.Join(mainPath, ".git/worktrees/bugfix"), IsMain: false},
 	}, nil)
 
-	_, src, warns, intent, err := ResolveColor(linkedBPath, "", false)
+	_, src, warns, intent, _, err := ResolveColor(linkedBPath, "", false, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -281,7 +286,7 @@ func TestResolveColor_WorktreeCaseB_MainTargetNoColor(t *testing.T) {
 		{Path: mainPath, GitDir: filepath.Join(mainPath, ".git"), IsMain: true},
 	}, nil)
 
-	_, src, warns, intent, err := ResolveColor(mainPath, "", false)
+	_, src, warns, intent, _, err := ResolveColor(mainPath, "", false, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -293,6 +298,132 @@ func TestResolveColor_WorktreeCaseB_MainTargetNoColor(t *testing.T) {
 	}
 	if len(warns) != 0 {
 		t.Errorf("warns = %v, want empty (Case B is silent)", warns)
+	}
+}
+
+func TestBuildPropagateTargets_SkipsMainAndUncolored(t *testing.T) {
+	base := t.TempDir()
+	mainPath := filepath.Join(base, "myproj")
+	feat := filepath.Join(base, "myproj-feat-x")
+	bug := filepath.Join(base, "myproj-bugfix")
+	hot := filepath.Join(base, "myproj-hotfix")
+	for _, p := range []string{mainPath, feat, bug, hot} {
+		if err := os.MkdirAll(p, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// feat: in family (peacock.color present)
+	writeWorkspaceWithColor(t, filepath.Join(base, "myproj-feat-x.code-workspace"), "#7a5bac")
+	// bug: in family (peacock.color present)
+	writeWorkspaceWithColor(t, filepath.Join(base, "myproj-bugfix.code-workspace"), "#4a2b6c")
+	// hot: .code-workspace exists but no peacock keys — should be skipped
+	if err := os.WriteFile(filepath.Join(base, "myproj-hotfix.code-workspace"),
+		[]byte(`{"folders":[{"path":"./myproj-hotfix"}]}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	worktrees := []gitworktree.Worktree{
+		{Path: mainPath, GitDir: filepath.Join(mainPath, ".git"), IsMain: true},
+		{Path: feat, GitDir: filepath.Join(mainPath, ".git/worktrees/feat-x"), IsMain: false},
+		{Path: bug, GitDir: filepath.Join(mainPath, ".git/worktrees/bugfix"), IsMain: false},
+		{Path: hot, GitDir: filepath.Join(mainPath, ".git/worktrees/hotfix"), IsMain: false},
+	}
+	anchor := color.Color{R: 0xaa, G: 0xbb, B: 0xcc}
+
+	targets, skipped := buildPropagateTargets(worktrees, anchor)
+
+	if len(targets) != 2 {
+		t.Fatalf("targets count = %d, want 2 (feat, bug); got %v", len(targets), targets)
+	}
+	gotPaths := map[string]bool{}
+	for _, tgt := range targets {
+		gotPaths[tgt.WorkspacePath] = true
+		if tgt.DerivedColor == anchor {
+			t.Errorf("derived color = anchor for %s; expected non-zero offset", tgt.WorkspacePath)
+		}
+	}
+	if !gotPaths[filepath.Join(base, "myproj-feat-x.code-workspace")] {
+		t.Errorf("missing feat-x in targets")
+	}
+	if !gotPaths[filepath.Join(base, "myproj-bugfix.code-workspace")] {
+		t.Errorf("missing bugfix in targets")
+	}
+
+	if len(skipped) != 1 {
+		t.Fatalf("skipped count = %d, want 1 (hotfix); got %v", len(skipped), skipped)
+	}
+	if skipped[0].WorkspacePath != filepath.Join(base, "myproj-hotfix.code-workspace") {
+		t.Errorf("skipped path = %s, want hotfix", skipped[0].WorkspacePath)
+	}
+	if skipped[0].Reason == "" {
+		t.Errorf("skipped reason is empty")
+	}
+}
+
+func TestBuildPropagateTargets_SkipsMissingWorkspaceFile(t *testing.T) {
+	base := t.TempDir()
+	mainPath := filepath.Join(base, "myproj")
+	feat := filepath.Join(base, "myproj-feat-x")
+	for _, p := range []string{mainPath, feat} {
+		if err := os.MkdirAll(p, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// feat has NO .code-workspace file at all
+
+	worktrees := []gitworktree.Worktree{
+		{Path: mainPath, GitDir: filepath.Join(mainPath, ".git"), IsMain: true},
+		{Path: feat, GitDir: filepath.Join(mainPath, ".git/worktrees/feat-x"), IsMain: false},
+	}
+	anchor := color.Color{R: 0xaa, G: 0xbb, B: 0xcc}
+
+	targets, skipped := buildPropagateTargets(worktrees, anchor)
+
+	if len(targets) != 0 {
+		t.Errorf("targets = %v, want empty", targets)
+	}
+	if len(skipped) != 1 {
+		t.Fatalf("skipped count = %d, want 1", len(skipped))
+	}
+	if !strings.Contains(skipped[0].Reason, "no .code-workspace") {
+		t.Errorf("skipped reason = %q, want substring 'no .code-workspace'", skipped[0].Reason)
+	}
+}
+
+func TestBuildPropagateTargets_SkipsOnParseError(t *testing.T) {
+	base := t.TempDir()
+	mainPath := filepath.Join(base, "myproj")
+	feat := filepath.Join(base, "myproj-feat-x")
+	for _, p := range []string{mainPath, feat} {
+		if err := os.MkdirAll(p, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// Malformed JSON → workspace.Read returns parse error
+	if err := os.WriteFile(filepath.Join(base, "myproj-feat-x.code-workspace"),
+		[]byte(`{"settings": {`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	worktrees := []gitworktree.Worktree{
+		{Path: mainPath, GitDir: filepath.Join(mainPath, ".git"), IsMain: true},
+		{Path: feat, GitDir: filepath.Join(mainPath, ".git/worktrees/feat-x"), IsMain: false},
+	}
+	anchor := color.Color{R: 0xaa, G: 0xbb, B: 0xcc}
+
+	targets, skipped := buildPropagateTargets(worktrees, anchor)
+
+	if len(targets) != 0 {
+		t.Errorf("targets = %v, want empty (parse error → no targets)", targets)
+	}
+	if len(skipped) != 1 {
+		t.Fatalf("skipped count = %d, want 1", len(skipped))
+	}
+	if !strings.Contains(skipped[0].Reason, "parse error") {
+		t.Errorf("skipped reason = %q, want substring 'parse error'", skipped[0].Reason)
+	}
+	wantPath := filepath.Join(base, "myproj-feat-x.code-workspace")
+	if skipped[0].WorkspacePath != wantPath {
+		t.Errorf("skipped path = %q, want %q", skipped[0].WorkspacePath, wantPath)
 	}
 }
 
@@ -312,7 +443,7 @@ func TestResolveColor_WorktreeCaseC_LinkedFirst_ReturnsIntent(t *testing.T) {
 		{Path: linkedPath, GitDir: filepath.Join(mainPath, ".git/worktrees/feat-x"), IsMain: false},
 	}, nil)
 
-	c, src, warns, intent, err := ResolveColor(linkedPath, "", false)
+	c, src, warns, intent, _, err := ResolveColor(linkedPath, "", false, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -333,5 +464,275 @@ func TestResolveColor_WorktreeCaseC_LinkedFirst_ReturnsIntent(t *testing.T) {
 	}
 	if len(warns) == 0 || !strings.Contains(warns[0], "family anchor created") {
 		t.Errorf("warns = %v, want anchor-created notice", warns)
+	}
+}
+
+func TestResolveColor_A2_MainForce_NoColor_BuildsIntent(t *testing.T) {
+	base := t.TempDir()
+	mainPath := filepath.Join(base, "myproj")
+	feat := filepath.Join(base, "myproj-feat-x")
+	for _, p := range []string{mainPath, feat} {
+		if err := os.MkdirAll(p, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	writeWorkspaceWithColor(t, filepath.Join(base, "myproj.code-workspace"), "#5a3b8c")
+	writeWorkspaceWithColor(t, filepath.Join(base, "myproj-feat-x.code-workspace"), "#7a5bac")
+
+	withFakeWorktrees(t, []gitworktree.Worktree{
+		{Path: mainPath, GitDir: filepath.Join(mainPath, ".git"), IsMain: true},
+		{Path: feat, GitDir: filepath.Join(mainPath, ".git/worktrees/feat-x"), IsMain: false},
+	}, nil)
+
+	c, src, _, _, propagate, err := ResolveColor(mainPath, "", true, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if src != SourceWorktree {
+		t.Errorf("source = %v, want SourceWorktree", src)
+	}
+	if propagate == nil {
+		t.Fatal("propagate intent = nil, want non-nil")
+	}
+	if propagate.AnchorColor != c {
+		t.Errorf("intent.AnchorColor = %v, want %v (= ColorHex)", propagate.AnchorColor, c)
+	}
+	wantAnchor := filepath.Join(base, "myproj.code-workspace")
+	if propagate.AnchorPath != wantAnchor {
+		t.Errorf("intent.AnchorPath = %q, want %q", propagate.AnchorPath, wantAnchor)
+	}
+	if len(propagate.Targets) != 1 {
+		t.Errorf("targets = %v, want 1 (feat-x)", propagate.Targets)
+	}
+	original := color.Color{R: 0x5a, G: 0x3b, B: 0x8c}
+	if c == original {
+		t.Errorf("got same color as existing main color (%v); A2 should regenerate when no --color given", c)
+	}
+}
+
+func TestResolveColor_A2_MainForce_WithColor_UsesFlag(t *testing.T) {
+	base := t.TempDir()
+	mainPath := filepath.Join(base, "myproj")
+	feat := filepath.Join(base, "myproj-feat-x")
+	for _, p := range []string{mainPath, feat} {
+		if err := os.MkdirAll(p, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	writeWorkspaceWithColor(t, filepath.Join(base, "myproj.code-workspace"), "#5a3b8c")
+	writeWorkspaceWithColor(t, filepath.Join(base, "myproj-feat-x.code-workspace"), "#7a5bac")
+
+	withFakeWorktrees(t, []gitworktree.Worktree{
+		{Path: mainPath, GitDir: filepath.Join(mainPath, ".git"), IsMain: true},
+		{Path: feat, GitDir: filepath.Join(mainPath, ".git/worktrees/feat-x"), IsMain: false},
+	}, nil)
+
+	c, src, _, _, propagate, err := ResolveColor(mainPath, "#aabbcc", true, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if src != SourceWorktree {
+		t.Errorf("source = %v, want SourceWorktree (A2 with --color uses flag as anchor)", src)
+	}
+	want := color.Color{R: 0xaa, G: 0xbb, B: 0xcc}
+	if c != want {
+		t.Errorf("color = %v, want #aabbcc", c)
+	}
+	if propagate == nil {
+		t.Fatal("propagate = nil")
+	}
+	if propagate.AnchorColor != want {
+		t.Errorf("anchor = %v, want #aabbcc", propagate.AnchorColor)
+	}
+}
+
+func TestResolveColor_A2_NoForce_FallsThrough(t *testing.T) {
+	// Without --force, the runner short-circuits on existing peacock keys.
+	// At the resolve layer, force=false on multi-worktree main with main color
+	// must not trigger A2 (no propagation, no SourceWorktree label).
+	base := t.TempDir()
+	mainPath := filepath.Join(base, "myproj")
+	feat := filepath.Join(base, "myproj-feat-x")
+	for _, p := range []string{mainPath, feat} {
+		if err := os.MkdirAll(p, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	writeWorkspaceWithColor(t, filepath.Join(base, "myproj.code-workspace"), "#5a3b8c")
+	writeWorkspaceWithColor(t, filepath.Join(base, "myproj-feat-x.code-workspace"), "#7a5bac")
+
+	withFakeWorktrees(t, []gitworktree.Worktree{
+		{Path: mainPath, GitDir: filepath.Join(mainPath, ".git"), IsMain: true},
+		{Path: feat, GitDir: filepath.Join(mainPath, ".git/worktrees/feat-x"), IsMain: false},
+	}, nil)
+
+	_, _, _, _, propagate, err := ResolveColor(mainPath, "", false, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if propagate != nil {
+		t.Errorf("propagate intent = %v, want nil (force=false)", propagate)
+	}
+}
+
+func TestFormatPropagatedWarning_AllSuccess(t *testing.T) {
+	intent := &PropagateIntent{
+		AnchorPath:  "/code/myproj.code-workspace",
+		AnchorColor: color.Color{R: 0x5a, G: 0x3b, B: 0x8c},
+		Targets: []PropagateTarget{
+			{WorkspacePath: "/code/myproj-feat-x.code-workspace", DerivedColor: color.Color{R: 0x67, G: 0x47, B: 0xa4}},
+			{WorkspacePath: "/code/myproj-bugfix.code-workspace", DerivedColor: color.Color{R: 0x4a, G: 0x2b, B: 0x6c}},
+		},
+		Skipped: []SkippedLinked{
+			{WorkspacePath: "/code/myproj-hotfix.code-workspace", Reason: "no peacock keys"},
+		},
+	}
+	got := formatPropagatedWarning(intent, nil)
+
+	for _, want := range []string{
+		"family propagated from main worktree",
+		"/code/myproj.code-workspace",
+		"#5a3b8c",
+		"/code/myproj-feat-x.code-workspace",
+		"#6747a4",
+		"/code/myproj-bugfix.code-workspace",
+		"/code/myproj-hotfix.code-workspace",
+		"no peacock keys",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("warning missing %q\n%s", want, got)
+		}
+	}
+
+	appliedAt := strings.Index(got, "applied")
+	skippedAt := strings.Index(got, "skipped")
+	if appliedAt < 0 || skippedAt < 0 {
+		t.Fatalf("expected both 'applied' and 'skipped' in output, got %q", got)
+	}
+	if appliedAt > skippedAt {
+		t.Errorf("section order: 'applied' (idx=%d) must come before 'skipped' (idx=%d)\n%s",
+			appliedAt, skippedAt, got)
+	}
+}
+
+func TestFormatPropagatedWarning_PartialFailure(t *testing.T) {
+	intent := &PropagateIntent{
+		AnchorPath:  "/code/myproj.code-workspace",
+		AnchorColor: color.Color{R: 0x5a, G: 0x3b, B: 0x8c},
+		Targets: []PropagateTarget{
+			{WorkspacePath: "/code/myproj-feat-x.code-workspace", DerivedColor: color.Color{R: 0x67, G: 0x47, B: 0xa4}},
+		},
+	}
+	failed := []PropagateFailure{
+		{WorkspacePath: "/code/myproj-bugfix.code-workspace", Err: errors.New("permission denied")},
+	}
+	got := formatPropagatedWarning(intent, failed)
+
+	for _, want := range []string{
+		"applied",
+		"/code/myproj-feat-x.code-workspace",
+		"failed",
+		"/code/myproj-bugfix.code-workspace",
+		"permission denied",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("warning missing %q\n%s", want, got)
+		}
+	}
+
+	appliedAt := strings.Index(got, "applied")
+	failedAt := strings.Index(got, "failed")
+	if appliedAt < 0 || failedAt < 0 {
+		t.Fatalf("expected both 'applied' and 'failed' in output, got %q", got)
+	}
+	if appliedAt > failedAt {
+		t.Errorf("section order: 'applied' (idx=%d) must come before 'failed' (idx=%d)\n%s",
+			appliedAt, failedAt, got)
+	}
+}
+
+func TestFormatPropagatedWarning_NoLinkedInFamily(t *testing.T) {
+	intent := &PropagateIntent{
+		AnchorPath:  "/code/myproj.code-workspace",
+		AnchorColor: color.Color{R: 0x5a, G: 0x3b, B: 0x8c},
+	}
+	got := formatPropagatedWarning(intent, nil)
+	if !strings.Contains(got, "no linked worktrees in family") {
+		t.Errorf("warning missing empty-family hint\n%s", got)
+	}
+}
+
+func TestResolveColor_FlagOverridesA3(t *testing.T) {
+	base := t.TempDir()
+	mainPath := filepath.Join(base, "myproj")
+	feat := filepath.Join(base, "myproj-feat-x")
+	for _, p := range []string{mainPath, feat} {
+		if err := os.MkdirAll(p, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	writeWorkspaceWithColor(t, filepath.Join(base, "myproj.code-workspace"), "#5a3b8c")
+
+	withFakeWorktrees(t, []gitworktree.Worktree{
+		{Path: mainPath, GitDir: filepath.Join(mainPath, ".git"), IsMain: true},
+		{Path: feat, GitDir: filepath.Join(mainPath, ".git/worktrees/feat-x"), IsMain: false},
+	}, nil)
+
+	c, src, _, anchor, propagate, err := ResolveColor(feat, "#aabbcc", false, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if src != SourceFlag {
+		t.Errorf("source = %v, want SourceFlag (--color must override A3)", src)
+	}
+	want := color.Color{R: 0xaa, G: 0xbb, B: 0xcc}
+	if c != want {
+		t.Errorf("color = %v, want %v (--color value)", c, want)
+	}
+	if anchor != nil {
+		t.Errorf("anchor = %v, want nil", anchor)
+	}
+	if propagate != nil {
+		t.Errorf("propagate = %v, want nil", propagate)
+	}
+}
+
+func TestResolveColor_FlagOverridesCaseC(t *testing.T) {
+	base := t.TempDir()
+	mainPath := filepath.Join(base, "myproj")
+	feat := filepath.Join(base, "myproj-feat-x")
+	for _, p := range []string{mainPath, feat} {
+		if err := os.MkdirAll(p, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// Neither main nor feat has a .code-workspace
+
+	withFakeWorktrees(t, []gitworktree.Worktree{
+		{Path: mainPath, GitDir: filepath.Join(mainPath, ".git"), IsMain: true},
+		{Path: feat, GitDir: filepath.Join(mainPath, ".git/worktrees/feat-x"), IsMain: false},
+	}, nil)
+
+	c, src, _, anchor, propagate, err := ResolveColor(feat, "#aabbcc", false, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if src != SourceFlag {
+		t.Errorf("source = %v, want SourceFlag (--color must override Case C)", src)
+	}
+	want := color.Color{R: 0xaa, G: 0xbb, B: 0xcc}
+	if c != want {
+		t.Errorf("color = %v, want %v (--color value)", c, want)
+	}
+	if anchor != nil {
+		t.Errorf("anchor = %v, want nil (no auto-establish under --color)", anchor)
+	}
+	if propagate != nil {
+		t.Errorf("propagate = %v, want nil", propagate)
+	}
+	// Verify main's .code-workspace was NOT created
+	mainWs := filepath.Join(base, "myproj.code-workspace")
+	if _, err := os.Stat(mainWs); err == nil {
+		t.Errorf("main .code-workspace should NOT exist under --color, but it does")
 	}
 }
