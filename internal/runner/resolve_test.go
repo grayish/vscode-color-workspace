@@ -603,6 +603,16 @@ func TestFormatPropagatedWarning_AllSuccess(t *testing.T) {
 			t.Errorf("warning missing %q\n%s", want, got)
 		}
 	}
+
+	appliedAt := strings.Index(got, "applied")
+	skippedAt := strings.Index(got, "skipped")
+	if appliedAt < 0 || skippedAt < 0 {
+		t.Fatalf("expected both 'applied' and 'skipped' in output, got %q", got)
+	}
+	if appliedAt > skippedAt {
+		t.Errorf("section order: 'applied' (idx=%d) must come before 'skipped' (idx=%d)\n%s",
+			appliedAt, skippedAt, got)
+	}
 }
 
 func TestFormatPropagatedWarning_PartialFailure(t *testing.T) {
@@ -628,6 +638,16 @@ func TestFormatPropagatedWarning_PartialFailure(t *testing.T) {
 		if !strings.Contains(got, want) {
 			t.Errorf("warning missing %q\n%s", want, got)
 		}
+	}
+
+	appliedAt := strings.Index(got, "applied")
+	failedAt := strings.Index(got, "failed")
+	if appliedAt < 0 || failedAt < 0 {
+		t.Fatalf("expected both 'applied' and 'failed' in output, got %q", got)
+	}
+	if appliedAt > failedAt {
+		t.Errorf("section order: 'applied' (idx=%d) must come before 'failed' (idx=%d)\n%s",
+			appliedAt, failedAt, got)
 	}
 }
 
