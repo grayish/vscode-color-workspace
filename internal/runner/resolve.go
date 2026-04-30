@@ -78,54 +78,61 @@ type PropagateFailure struct {
 var listWorktreesFn = gitworktree.List
 
 // ResolveColor applies the priority rules:
-//  1. Explicit --color flag                               → SourceFlag
-//  2. Worktree family logic (Case A or C in spec)         → SourceWorktree
-//  3. peacock.color in target's .vscode/settings.json     → SourceSettings
-//  4. Random                                              → SourceRandom
+//  1. Explicit --color flag (unless A2 consumes it as anchor) → SourceFlag
+//  2. Worktree family logic (Cases A1/A2/A3/B/C/D in spec)   → SourceWorktree
+//  3. peacock.color in target's .vscode/settings.json         → SourceSettings
+//  4. Random                                                  → SourceRandom
 //
 // The third return is informational warnings to be surfaced via Result.Warnings.
-// The fourth return is non-nil only for Case C (auto-establish), where the
-// caller must write the anchor color into the main worktree's .code-workspace.
+// The fourth return (*AnchorIntent) is non-nil only for Case C (auto-establish).
+// The fifth return (*PropagateIntent) is non-nil only for Case A2 (multi-worktree
+// main + force). The caller (runner.Run) is responsible for executing writes.
 // When debug is true, branch-by-branch diagnostics are written to stderr.
-func ResolveColor(targetDir, flag string, force, debug bool) (color.Color, ColorSource, []string, *AnchorIntent, error) {
-	dbg(debug, "ResolveColor: targetDir=%q flag=%q", targetDir, flag)
+func ResolveColor(targetDir, flag string, force, debug bool) (color.Color, ColorSource, []string, *AnchorIntent, *PropagateIntent, error) {
+	dbg(debug, "ResolveColor: targetDir=%q flag=%q force=%v", targetDir, flag, force)
+
+	var parsedFlag color.Color
 	if flag != "" {
-		c, err := color.Parse(flag)
+		p, err := color.Parse(flag)
 		if err != nil {
-			return color.Color{}, 0, nil, nil, fmt.Errorf("--color: %w", err)
+			return color.Color{}, 0, nil, nil, nil, fmt.Errorf("--color: %w", err)
 		}
-		dbg(debug, "ResolveColor: source=Flag color=%s", c.Hex())
-		return c, SourceFlag, nil, nil, nil
+		parsedFlag = p
 	}
 
-	c, src, warns, intent, ok, err := resolveFromWorktree(targetDir, flag, force, debug)
+	c, src, warns, anchorIntent, propagateIntent, ok, err := resolveFromWorktree(targetDir, flag, force, debug)
 	if err != nil {
-		return color.Color{}, 0, nil, nil, err
+		return color.Color{}, 0, nil, nil, nil, err
 	}
 	if ok {
 		dbg(debug, "ResolveColor: worktree logic decided source=%v color=%s", src, c.Hex())
-		return c, src, warns, intent, nil
+		return c, src, warns, anchorIntent, propagateIntent, nil
 	}
-	dbg(debug, "ResolveColor: worktree logic skipped — falling through to settings/random")
+	dbg(debug, "ResolveColor: worktree logic skipped — falling through")
 
-	// fall through to existing chain — preserve any Case-D warnings
+	if flag != "" {
+		dbg(debug, "ResolveColor: source=Flag color=%s", parsedFlag.Hex())
+		return parsedFlag, SourceFlag, warns, nil, nil, nil
+	}
+
+	// fall through to settings.json → random — preserve any Case-D warnings
 	s, err := vscodesettings.Read(filepath.Join(targetDir, ".vscode", "settings.json"))
 	if err != nil {
-		return color.Color{}, 0, warns, nil, err
+		return color.Color{}, 0, warns, nil, nil, err
 	}
 	if s != nil {
 		if pc, ok := s.PeacockColor(); ok {
-			c, err := color.Parse(pc)
-			if err != nil {
-				return color.Color{}, 0, warns, nil, fmt.Errorf("peacock.color in settings: %w", err)
+			parsed, perr := color.Parse(pc)
+			if perr != nil {
+				return color.Color{}, 0, warns, nil, nil, fmt.Errorf("peacock.color in settings: %w", perr)
 			}
-			dbg(debug, "ResolveColor: source=Settings color=%s", c.Hex())
-			return c, SourceSettings, warns, nil, nil
+			dbg(debug, "ResolveColor: source=Settings color=%s", parsed.Hex())
+			return parsed, SourceSettings, warns, nil, nil, nil
 		}
 	}
 	rc := color.Random()
 	dbg(debug, "ResolveColor: source=Random color=%s", rc.Hex())
-	return rc, SourceRandom, warns, nil, nil
+	return rc, SourceRandom, warns, nil, nil, nil
 }
 
 // readWorkspacePeacockColor parses the workspace file at path and returns
@@ -152,19 +159,19 @@ func readWorkspacePeacockColor(path string) (*color.Color, error) {
 
 // resolveFromWorktree consults the worktree context. Return tuple semantics:
 //
-//	ok=true  → color decided by worktree logic; caller uses (c, src, warns, intent)
+//	ok=true  → color decided by worktree logic; caller uses (c, src, warns, anchorIntent, propagateIntent)
 //	ok=false → fall through to settings/random; warns may carry a Case-D notice
 //	err!=nil → hard error (e.g., file write failure for AnchorIntent)
-func resolveFromWorktree(targetDir, flag string, force, debug bool) (color.Color, ColorSource, []string, *AnchorIntent, bool, error) {
+func resolveFromWorktree(targetDir, flag string, force, debug bool) (color.Color, ColorSource, []string, *AnchorIntent, *PropagateIntent, bool, error) {
 	dbg(debug, "resolveFromWorktree: targetDir=%q", targetDir)
 	worktrees, err := listWorktreesFn(targetDir)
 	if errors.Is(err, gitworktree.ErrNotInWorktree) {
 		dbg(debug, "  gitworktree.List → ErrNotInWorktree (wrapped: %v)", err)
-		return color.Color{}, 0, nil, nil, false, nil
+		return color.Color{}, 0, nil, nil, nil, false, nil
 	}
 	if err != nil {
 		dbg(debug, "  gitworktree.List → hard error: %v", err)
-		return color.Color{}, 0, nil, nil, false, err
+		return color.Color{}, 0, nil, nil, nil, false, err
 	}
 	dbg(debug, "  gitworktree.List → %d worktrees", len(worktrees))
 	for i, w := range worktrees {
@@ -173,7 +180,7 @@ func resolveFromWorktree(targetDir, flag string, force, debug bool) (color.Color
 	self := gitworktree.FindSelf(worktrees, targetDir)
 	if self == nil {
 		dbg(debug, "  FindSelf(%q) → nil (no worktree path matched target)", targetDir)
-		return color.Color{}, 0, nil, nil, false, nil
+		return color.Color{}, 0, nil, nil, nil, false, nil
 	}
 	dbg(debug, "  FindSelf → path=%q isMain=%v", self.Path, self.IsMain)
 
@@ -181,21 +188,45 @@ func resolveFromWorktree(targetDir, flag string, force, debug bool) (color.Color
 	mainWsPath, err := workspaceFilePath(main.Path)
 	if err != nil {
 		dbg(debug, "  workspaceFilePath(main=%q) error: %v", main.Path, err)
-		return color.Color{}, 0, nil, nil, false, err
+		return color.Color{}, 0, nil, nil, nil, false, err
 	}
 	dbg(debug, "  main worktree: path=%q wsPath=%q", main.Path, mainWsPath)
 
 	mainColor, err := readWorkspacePeacockColor(mainWsPath)
 	if err != nil {
 		dbg(debug, "  readWorkspacePeacockColor(%q) error: %v", mainWsPath, err)
-		return color.Color{}, 0, nil, nil, false, err
+		return color.Color{}, 0, nil, nil, nil, false, err
 	}
 
 	// Case A1: target is the only worktree (regular git repo, no linked).
 	// "Family" doesn't apply — fall through to settings/random.
 	if mainColor != nil && self.IsMain && len(worktrees) == 1 {
 		dbg(debug, "  Case A1: single-worktree main — skip worktree logic")
-		return color.Color{}, 0, nil, nil, false, nil
+		return color.Color{}, 0, nil, nil, nil, false, nil
+	}
+
+	// Case A2: target is main of a multi-worktree repo and --force given.
+	// Regenerate anchor and propagate to all colored linked worktrees.
+	if mainColor != nil && self.IsMain && len(worktrees) > 1 && force {
+		var anchor color.Color
+		if flag != "" {
+			parsed, perr := color.Parse(flag)
+			if perr != nil {
+				return color.Color{}, 0, nil, nil, nil, false, fmt.Errorf("--color: %w", perr)
+			}
+			anchor = parsed
+		} else {
+			anchor = color.Random()
+		}
+		targets, skipped := buildPropagateTargets(worktrees, anchor)
+		intent := &PropagateIntent{
+			AnchorPath:  mainWsPath,
+			AnchorColor: anchor,
+			Targets:     targets,
+			Skipped:     skipped,
+		}
+		dbg(debug, "  Case A2: anchor=%s targets=%d skipped=%d", anchor.Hex(), len(targets), len(skipped))
+		return anchor, SourceWorktree, nil, nil, intent, true, nil
 	}
 
 	// Case A: main has a color — anchor + offset (A3 in spec terminology)
@@ -203,7 +234,7 @@ func resolveFromWorktree(targetDir, flag string, force, debug bool) (color.Color
 		offset := color.LadderOffset(gitworktree.IdentityHash(*self))
 		derived := mainColor.ApplyLightness(offset)
 		dbg(debug, "  Case A: mainColor=%s offset=%v derived=%s", mainColor.Hex(), offset, derived.Hex())
-		return derived, SourceWorktree, nil, nil, true, nil
+		return derived, SourceWorktree, nil, nil, nil, true, nil
 	}
 	dbg(debug, "  main worktree has no peacock.color (or wsfile missing): %s", mainWsPath)
 
@@ -211,41 +242,41 @@ func resolveFromWorktree(targetDir, flag string, force, debug bool) (color.Color
 	linked, linkedColor, err := findLinkedWithColor(worktrees, self)
 	if err != nil {
 		dbg(debug, "  findLinkedWithColor error: %v", err)
-		return color.Color{}, 0, nil, nil, false, err
+		return color.Color{}, 0, nil, nil, nil, false, err
 	}
 
 	// Case D: linked has color but main does not — refuse to derive a family
 	if linked != nil {
 		dbg(debug, "  Case D: linked=%q has color=%s; main empty → family disabled", linked.Path, linkedColor.Hex())
 		warn := formatFamilyDisabledWarning(linked, linkedColor, main, mainWsPath)
-		return color.Color{}, 0, []string{warn}, nil, false, nil
+		return color.Color{}, 0, []string{warn}, nil, nil, false, nil
 	}
 
 	// Case B: main is target and has no color, no linked has color either —
 	// fall through to existing chain (settings.json → random). No warning.
 	if self.IsMain {
 		dbg(debug, "  Case B: target is main, no color anywhere → fall through")
-		return color.Color{}, 0, nil, nil, false, nil
+		return color.Color{}, 0, nil, nil, nil, false, nil
 	}
 
 	// Case C: target is linked, no other worktree has color — auto-establish
 	// main as the family anchor with a random color. The runner executes
 	// the side effect (writeAnchorWorkspace) using the returned AnchorIntent.
 	anchor := color.Random()
-	intent := &AnchorIntent{
+	anchorIntent := &AnchorIntent{
 		WorkspacePath: mainWsPath,
 		AnchorColor:   anchor,
 	}
 	selfWsPath, err := workspaceFilePath(self.Path)
 	if err != nil {
 		dbg(debug, "  workspaceFilePath(self=%q) error: %v", self.Path, err)
-		return color.Color{}, 0, nil, nil, false, err
+		return color.Color{}, 0, nil, nil, nil, false, err
 	}
 	offset := color.LadderOffset(gitworktree.IdentityHash(*self))
 	derived := anchor.ApplyLightness(offset)
 	dbg(debug, "  Case C: anchor=%s wsPath=%q self=%q offset=%v derived=%s", anchor.Hex(), mainWsPath, selfWsPath, offset, derived.Hex())
 	warn := formatAnchorCreatedWarning(mainWsPath, selfWsPath)
-	return derived, SourceWorktree, []string{warn}, intent, true, nil
+	return derived, SourceWorktree, []string{warn}, anchorIntent, nil, true, nil
 }
 
 func formatAnchorCreatedWarning(mainWsPath, selfWsPath string) string {
