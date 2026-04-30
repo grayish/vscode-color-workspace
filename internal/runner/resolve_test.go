@@ -173,7 +173,7 @@ func TestResolveColor_WorktreeCaseA_LinkedTarget(t *testing.T) {
 	}
 }
 
-func TestResolveColor_WorktreeCaseA_MainTarget(t *testing.T) {
+func TestResolveColor_A1_SingleWorktreeMain_FallsThrough(t *testing.T) {
 	base := t.TempDir()
 	mainPath := filepath.Join(base, "myproj")
 	if err := os.MkdirAll(mainPath, 0755); err != nil {
@@ -185,16 +185,20 @@ func TestResolveColor_WorktreeCaseA_MainTarget(t *testing.T) {
 		{Path: mainPath, GitDir: filepath.Join(mainPath, ".git"), IsMain: true},
 	}, nil)
 
-	c, src, _, _, err := ResolveColor(mainPath, "", false, false)
+	c, src, _, _, err := ResolveColor(mainPath, "", true, false)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if src != SourceWorktree {
-		t.Errorf("source = %v, want SourceWorktree", src)
+	// Single-worktree main with --force should NOT enter Case A. With no
+	// settings.json peacock.color present, expect SourceRandom.
+	if src != SourceRandom {
+		t.Errorf("source = %v, want SourceRandom (A1 fall-through)", src)
 	}
-	want := color.Color{R: 0x5a, G: 0x3b, B: 0x8c}
-	if c != want {
-		t.Errorf("main color = %v, want %v (offset 0)", c, want)
+	// The random color must not match the existing main color (overwhelmingly
+	// unlikely; if it does, the test re-runs will catch any structural error).
+	original := color.Color{R: 0x5a, G: 0x3b, B: 0x8c}
+	if c == original {
+		t.Errorf("got same color as existing main color (%v); A1 should regenerate", c)
 	}
 }
 

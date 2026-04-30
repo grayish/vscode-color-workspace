@@ -191,7 +191,14 @@ func resolveFromWorktree(targetDir, flag string, force, debug bool) (color.Color
 		return color.Color{}, 0, nil, nil, false, err
 	}
 
-	// Case A: main has a color — anchor + offset
+	// Case A1: target is the only worktree (regular git repo, no linked).
+	// "Family" doesn't apply — fall through to settings/random.
+	if mainColor != nil && self.IsMain && len(worktrees) == 1 {
+		dbg(debug, "  Case A1: single-worktree main — skip worktree logic")
+		return color.Color{}, 0, nil, nil, false, nil
+	}
+
+	// Case A: main has a color — anchor + offset (A3 in spec terminology)
 	if mainColor != nil {
 		offset := color.LadderOffset(gitworktree.IdentityHash(*self))
 		derived := mainColor.ApplyLightness(offset)
