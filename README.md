@@ -45,7 +45,7 @@ Running `ccws` in `/home/me/code/myproj` will:
 
 ## Worktree color family
 
-When you run `ccws` inside a git worktree, it automatically picks a "family" color so sibling worktrees of the same repo look related but distinct (same hue/saturation, lightness shifted by ±5/±10/±15%).
+When you run `ccws` inside a git worktree, it automatically picks a "family" color so sibling worktrees of the same repo look related but distinct (same hue/saturation, lightness shifted by ±1 to ±7%).
 
 - First `ccws` on the main worktree: random color, becomes the family anchor.
 - First `ccws` on a linked worktree (main not yet colored): a random anchor is written to the main worktree's `.code-workspace` automatically, and the linked worktree gets a derived color. A warning is printed to stderr.
