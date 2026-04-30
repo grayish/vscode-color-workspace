@@ -4,7 +4,7 @@
 
 오늘 `ccws`의 색 결정은 `--color > .vscode/settings.json의 peacock.color > 랜덤` 우선순위를 따른다 (`internal/runner/resolve.go`). git 워크트리를 쓰는 사용자는 한 repo에서 여러 워크트리(예: `myproj/`, `myproj-feat-x/`, `myproj-bugfix/`)를 동시에 열어두는데, 각 워크트리가 별도 `.code-workspace`를 갖고 색이 독립적으로 랜덤 결정되므로 **서로 무관한 색**으로 보인다. 같은 repo의 워크트리들이라는 시각적 단서가 사라진다.
 
-목표: 같은 repo의 워크트리들이 자동으로 **같은 색 가족**(같은 hue/saturation, 명도만 살짝 다름)으로 보이도록 만든다. 사용자는 추가 플래그를 외울 필요가 없다. main 워크트리의 색이 anchor가 되고, linked 워크트리들은 그 anchor에서 명도만 ±5/±10/±15% 정도 다른 색을 자동으로 부여받는다.
+목표: 같은 repo의 워크트리들이 자동으로 **같은 색 가족**(같은 hue/saturation, 명도만 살짝 다름)으로 보이도록 만든다. 사용자는 추가 플래그를 외울 필요가 없다. main 워크트리의 색이 anchor가 되고, linked 워크트리들은 그 anchor에서 명도만 ±1~±7% 정도 다른 색을 자동으로 부여받는다.
 
 이 변경은 `2026-04-25-ccws-vscode-color-workspace-design.md`의 §색 결정 우선순위 부분을 확장한다 (supersede가 아닌 추가).
 
@@ -13,7 +13,7 @@ Non-goals:
 - 인터랙티브 모드에서 anchor 색 미리보기/선택 UI
 - hash 결과를 사용자가 직접 바꿀 수 있는 옵션 (escape hatch는 기존 `--color`로 충분)
 - main 워크트리 외부의 `.vscode/settings.json` 정리 (target이 아닌 디렉토리 손대는 것은 invasive)
-- bare repo, 6개 이상의 워크트리에서의 충돌 회피 로직
+- bare repo, 워크트리 수가 늘어났을 때의 hash 충돌 회피 로직 (LadderRange 14가지에서 우연히 같은 오프셋이 나오는 경우 그대로 받아들임)
 
 ## 2. 트리거와 새 동작 매트릭스
 
@@ -140,19 +140,36 @@ var ErrNotInWorktree = errors.New("gitworktree: target is not in a git worktree"
 ```go
 package color
 
-// LadderSteps are the lightness deltas (in HSL %) assigned by hash bucket.
-// Six positions, symmetric around 0, ordered for stable bucket assignment.
-// Excludes 0 — main worktree gets offset 0 by convention (IdentityHash returns 0).
-var LadderSteps = []float64{-15, -10, -5, +5, +10, +15}
+// LadderRange is the maximum HSL lightness delta (%) applied to derived
+// colors. LadderOffset returns an integer offset in [-LadderRange, +LadderRange]
+// excluding 0 (which is reserved for the main worktree).
+const LadderRange = 7
 
 // LadderOffset returns the lightness delta (%) for a hash.
-//   - hash == 0 → 0 (main).
-//   - else → LadderSteps[hash % len(LadderSteps)].
+//   - hash == 0 → 0 (main worktree convention).
+//   - hash != 0 → integer in {-7,...,-1, +1,...,+7}, derived as
+//                 hash % (2*LadderRange) mapped onto the symmetric set.
 func LadderOffset(hash uint64) float64
 
 // ApplyLightness returns c with its HSL lightness shifted by deltaPct.
-// L is clamped to [5, 95] to keep colors readable. deltaPct == 0 returns c.
+// Delegates to existing Lighten/Darken primitives, which clamp HSL to [0, 1].
+// deltaPct == 0 returns c unchanged.
 func (c Color) ApplyLightness(deltaPct float64) Color
+```
+
+Implementation:
+
+```go
+func LadderOffset(hash uint64) float64 {
+    if hash == 0 {
+        return 0
+    }
+    n := int(hash%uint64(2*LadderRange)) - LadderRange  // n ∈ [-7, 6]
+    if n >= 0 {
+        return float64(n + 1)  // +1..+7
+    }
+    return float64(n)  // -7..-1
+}
 ```
 
 `Color`에는 이미 `Lighten`/`Darken` 메서드가 있고 HSL의 S/L에 대해 `clamp01`이 적용되어 있다 (`internal/color/primitives.go:48-49`). 따라서 `ApplyLightness`는 단순 위임:
@@ -170,7 +187,12 @@ func (c Color) ApplyLightness(deltaPct float64) Color {
 }
 ```
 
-명시적인 [5, 95] clamp는 추가하지 않는다 — Lighten/Darken의 [0, 1] HSL clamp로 충분하고, "5% 이하의 거의 검정"은 워크트리 파생 색의 자연스러운 끝값이기 때문.
+명시적인 [5, 95] clamp는 추가하지 않는다 — Lighten/Darken의 [0, 1] HSL clamp로 충분하고, 워크트리 파생 색이 극단까지 가는 경우는 base 색이 이미 끝값에 가까울 때뿐이라 자연스러운 끝값으로 본다.
+
+**왜 14가지인가 (vs 이전 6 버킷):** ±7%p에서 1%p 간격 정수 → 14가지 후보. 이전 `LadderSteps = {-15, -10, -5, +5, +10, +15}`(6 버킷, ±15까지)에 비해:
+- 두 워크트리 최대 간격이 30%p → 14%p로 줄어 family 결속 강화
+- 충돌 확률이 낮아짐: 5 워크트리 무충돌 ~31% (6 버킷) → ~67% (14 버킷, birthday formula)
+- 인접 hash가 1%p 차이로 떨어진 두 워크트리는 거의 같아 보일 수 있으나, family 느낌 강화 의도와 부합하므로 받아들인다 — 가족 안에서 모두 distinguishable일 필요는 없다.
 
 ## 8. Runner 레이어 변경
 
@@ -361,8 +383,9 @@ Case C가 인터랙티브에서 발생하는 경우(linked에서 시작, 색 비
 **`internal/color/ladder_test.go`:**
 
 - `TestLadderOffset_Zero` → 0
-- `TestLadderOffset_NonZero_InRange` — 임의 hash로 호출 시 결과가 LadderSteps 안에 있음
-- `TestLadderOffset_Distribution` — 1000개 랜덤 hash → 각 버킷 100~250 사이 (chi-square 같은 정밀 분포 검증은 안 함, 균등성만 확인)
+- `TestLadderOffset_NonZero_InRange` — 임의 hash로 호출 시 결과가 `{-7..-1, +1..+7}` 안에 있고 0이 아님
+- `TestLadderOffset_AllValuesReachable` — hash 0..1000 sweep로 14가지 값(±1~±7)이 모두 등장하는지 확인
+- `TestLadderOffset_Distribution` — 1000개 랜덤 hash → 14 버킷 각각 50~100 사이 (균등성만 확인, chi-square는 안 함)
 - `TestApplyLightness_Positive` — HSL L+5% (Lighten 위임 검증)
 - `TestApplyLightness_Negative` — HSL L-5% (Darken 위임 검증)
 - `TestApplyLightness_Zero` → 입력 그대로 (no-op)
@@ -397,7 +420,7 @@ type worktreeLister interface {
 
 **Manual smoke (CLAUDE.md 패턴):**
 
-- `git init` + `git commit` + `git worktree add` 후 ccws를 main, linked 순서로 실행 → linked 색이 main에서 ±5/±10/±15% 다른지 시각 확인
+- `git init` + `git commit` + `git worktree add` 후 ccws를 main, linked 순서로 실행 → linked 색이 main에서 ±1~±7% 다른지 시각 확인
 - 위를 linked, main 순서로 실행 → linked에서 첫 ccws 시 main의 `.code-workspace` 자동 생성 + warn 출력 확인
 - linked에 미리 색 박아둔 뒤 main에서 ccws → family disabled warn 확인
 - 비-git 디렉토리에서 ccws → 기존 흐름 유지 확인
@@ -412,7 +435,7 @@ type worktreeLister interface {
 | detached HEAD | Branch 빈 string. IdentityHash는 GitDir basename 사용이므로 영향 없음 |
 | `git worktree move` 후 ccws | git이 GitDir의 name 보존 → hash 안정 |
 | `git worktree repair` 필요한 손상 상태 | `List`가 비정상 출력 → `ErrNotInWorktree` 반환 → silent skip |
-| 6개 이상 linked worktree | LadderSteps 충돌 가능. 받아들임. anchor와는 항상 다름 (0%는 main 전용) |
+| 워크트리 수가 14를 넘거나 hash가 우연히 겹치는 경우 | 같은 오프셋이 나올 수 있음. 받아들임 — anchor(0%)와는 항상 다르고, family 안에서 가까운 색은 의도된 결과 |
 | main의 `.code-workspace`가 다른 사용자 설정 갖고 있음 | `workspace.Merge`로 peacock 키만 머지, 사용자 설정 보존 |
 | Case C에서 main의 `.code-workspace` 작성 실패 (권한 등) | hard error → ccws 실패. silent fallback 안 함 (anchor 없으면 family도 의미 없음) |
 | target이 main의 `.git/worktrees/<name>` 같은 비정상 경로 | FindSelf가 nil 반환 → silent skip |
@@ -467,7 +490,7 @@ type worktreeLister interface {
 | `internal/gitworktree/gitworktree.go` | 신규. `Worktree`, `List`, `FindSelf`, `IdentityHash`, `ErrNotInWorktree` |
 | `internal/gitworktree/gitworktree_test.go` | 신규. 파서/hash/FindSelf 단위 테스트 |
 | `internal/gitworktree/gitworktree_integration_test.go` | 신규. `//go:build integration`. 실제 git 호출 |
-| `internal/color/ladder.go` | 신규. `LadderSteps`, `LadderOffset`, `ApplyLightness` |
+| `internal/color/ladder.go` | 신규. `LadderRange`(상수), `LadderOffset`, `ApplyLightness` |
 | `internal/color/ladder_test.go` | 신규 |
 | `internal/runner/resolve.go` | `ResolveColor` 시그니처를 5-tuple `(color, source, warnings, anchorIntent, error)`로 확장, `AnchorIntent` 타입, `resolveFromWorktree`, `readWorkspacePeacockColor`, `findLinkedWithColor`, `formatFamilyDisabledWarning`, `formatAnchorCreatedWarning` 헬퍼 추가, `SourceWorktree` 추가 |
 | `internal/runner/resolve_test.go` | 기존 4 테스트 시그니처 업데이트 + Case A/B/C/D 테스트 추가 |
