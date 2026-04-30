@@ -389,6 +389,43 @@ func TestBuildPropagateTargets_SkipsMissingWorkspaceFile(t *testing.T) {
 	}
 }
 
+func TestBuildPropagateTargets_SkipsOnParseError(t *testing.T) {
+	base := t.TempDir()
+	mainPath := filepath.Join(base, "myproj")
+	feat := filepath.Join(base, "myproj-feat-x")
+	for _, p := range []string{mainPath, feat} {
+		if err := os.MkdirAll(p, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// Malformed JSON → workspace.Read returns parse error
+	if err := os.WriteFile(filepath.Join(base, "myproj-feat-x.code-workspace"),
+		[]byte(`{"settings": {`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	worktrees := []gitworktree.Worktree{
+		{Path: mainPath, GitDir: filepath.Join(mainPath, ".git"), IsMain: true},
+		{Path: feat, GitDir: filepath.Join(mainPath, ".git/worktrees/feat-x"), IsMain: false},
+	}
+	anchor := color.Color{R: 0xaa, G: 0xbb, B: 0xcc}
+
+	targets, skipped := buildPropagateTargets(worktrees, anchor)
+
+	if len(targets) != 0 {
+		t.Errorf("targets = %v, want empty (parse error → no targets)", targets)
+	}
+	if len(skipped) != 1 {
+		t.Fatalf("skipped count = %d, want 1", len(skipped))
+	}
+	if !strings.Contains(skipped[0].Reason, "parse error") {
+		t.Errorf("skipped reason = %q, want substring 'parse error'", skipped[0].Reason)
+	}
+	wantPath := filepath.Join(base, "myproj-feat-x.code-workspace")
+	if skipped[0].WorkspacePath != wantPath {
+		t.Errorf("skipped path = %q, want %q", skipped[0].WorkspacePath, wantPath)
+	}
+}
+
 func TestResolveColor_WorktreeCaseC_LinkedFirst_ReturnsIntent(t *testing.T) {
 	base := t.TempDir()
 	mainPath := filepath.Join(base, "myproj")
