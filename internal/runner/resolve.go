@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/sang-bin/vscode-color-workspace/internal/color"
 	"github.com/sang-bin/vscode-color-workspace/internal/gitworktree"
@@ -375,4 +376,33 @@ func formatFamilyDisabledWarning(linked *gitworktree.Worktree, linkedColor *colo
 		main.Path,
 		linkedColor.Hex(), main.Path,
 	)
+}
+
+// formatPropagatedWarning renders the multi-line warn produced by A2.
+// Sections (anchor / applied / failed / skipped) appear only when populated.
+// When no linked worktrees end up in any section, a one-line hint replaces them.
+//
+// Each row repeats its section label because cmd/ccws/render.go strips
+// leading whitespace before printing — continuation indents would render
+// as orphan paths.
+func formatPropagatedWarning(intent *PropagateIntent, failed []PropagateFailure) string {
+	var b strings.Builder
+	b.WriteString("family propagated from main worktree\n")
+	fmt.Fprintf(&b, "  anchor at  %s  %s", intent.AnchorPath, intent.AnchorColor.Hex())
+
+	if len(intent.Targets) == 0 && len(failed) == 0 && len(intent.Skipped) == 0 {
+		b.WriteString("\n  (no linked worktrees in family)")
+		return b.String()
+	}
+
+	for _, tgt := range intent.Targets {
+		fmt.Fprintf(&b, "\n  applied    %s  %s", tgt.WorkspacePath, tgt.DerivedColor.Hex())
+	}
+	for _, f := range failed {
+		fmt.Fprintf(&b, "\n  failed     %s  %s", f.WorkspacePath, f.Err.Error())
+	}
+	for _, s := range intent.Skipped {
+		fmt.Fprintf(&b, "\n  skipped    %s  (%s)", s.WorkspacePath, s.Reason)
+	}
+	return b.String()
 }

@@ -1,6 +1,7 @@
 package runner
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -571,5 +572,72 @@ func TestResolveColor_A2_NoForce_FallsThrough(t *testing.T) {
 	}
 	if propagate != nil {
 		t.Errorf("propagate intent = %v, want nil (force=false)", propagate)
+	}
+}
+
+func TestFormatPropagatedWarning_AllSuccess(t *testing.T) {
+	intent := &PropagateIntent{
+		AnchorPath:  "/code/myproj.code-workspace",
+		AnchorColor: color.Color{R: 0x5a, G: 0x3b, B: 0x8c},
+		Targets: []PropagateTarget{
+			{WorkspacePath: "/code/myproj-feat-x.code-workspace", DerivedColor: color.Color{R: 0x67, G: 0x47, B: 0xa4}},
+			{WorkspacePath: "/code/myproj-bugfix.code-workspace", DerivedColor: color.Color{R: 0x4a, G: 0x2b, B: 0x6c}},
+		},
+		Skipped: []SkippedLinked{
+			{WorkspacePath: "/code/myproj-hotfix.code-workspace", Reason: "no peacock keys"},
+		},
+	}
+	got := formatPropagatedWarning(intent, nil)
+
+	for _, want := range []string{
+		"family propagated from main worktree",
+		"/code/myproj.code-workspace",
+		"#5a3b8c",
+		"/code/myproj-feat-x.code-workspace",
+		"#6747a4",
+		"/code/myproj-bugfix.code-workspace",
+		"/code/myproj-hotfix.code-workspace",
+		"no peacock keys",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("warning missing %q\n%s", want, got)
+		}
+	}
+}
+
+func TestFormatPropagatedWarning_PartialFailure(t *testing.T) {
+	intent := &PropagateIntent{
+		AnchorPath:  "/code/myproj.code-workspace",
+		AnchorColor: color.Color{R: 0x5a, G: 0x3b, B: 0x8c},
+		Targets: []PropagateTarget{
+			{WorkspacePath: "/code/myproj-feat-x.code-workspace", DerivedColor: color.Color{R: 0x67, G: 0x47, B: 0xa4}},
+		},
+	}
+	failed := []PropagateFailure{
+		{WorkspacePath: "/code/myproj-bugfix.code-workspace", Err: errors.New("permission denied")},
+	}
+	got := formatPropagatedWarning(intent, failed)
+
+	for _, want := range []string{
+		"applied",
+		"/code/myproj-feat-x.code-workspace",
+		"failed",
+		"/code/myproj-bugfix.code-workspace",
+		"permission denied",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("warning missing %q\n%s", want, got)
+		}
+	}
+}
+
+func TestFormatPropagatedWarning_NoLinkedInFamily(t *testing.T) {
+	intent := &PropagateIntent{
+		AnchorPath:  "/code/myproj.code-workspace",
+		AnchorColor: color.Color{R: 0x5a, G: 0x3b, B: 0x8c},
+	}
+	got := formatPropagatedWarning(intent, nil)
+	if !strings.Contains(got, "no linked worktrees in family") {
+		t.Errorf("warning missing empty-family hint\n%s", got)
 	}
 }
