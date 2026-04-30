@@ -115,13 +115,10 @@ func (r *Runner) Run(opts Options) (*Result, error) {
 	}
 
 	c, src, resolveWarns, anchorIntent, propagateIntent, err := ResolveColor(abs, opts.ColorInput, opts.Force, opts.Debug)
-	if propagateIntent != nil {
-		// wired in Task 8
-		_ = propagateIntent
-	}
 	if err != nil {
 		return nil, err
 	}
+	_ = propagateIntent // TODO(task-8): writeFamilyPropagation(propagateIntent, opts)
 	if anchorIntent != nil {
 		if err := writeAnchorWorkspace(anchorIntent, opts); err != nil {
 			return nil, fmt.Errorf("write main anchor workspace: %w", err)

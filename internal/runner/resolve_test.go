@@ -503,6 +503,10 @@ func TestResolveColor_A2_MainForce_NoColor_BuildsIntent(t *testing.T) {
 	if len(propagate.Targets) != 1 {
 		t.Errorf("targets = %v, want 1 (feat-x)", propagate.Targets)
 	}
+	original := color.Color{R: 0x5a, G: 0x3b, B: 0x8c}
+	if c == original {
+		t.Errorf("got same color as existing main color (%v); A2 should regenerate when no --color given", c)
+	}
 }
 
 func TestResolveColor_A2_MainForce_WithColor_UsesFlag(t *testing.T) {
