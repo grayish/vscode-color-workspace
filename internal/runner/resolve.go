@@ -40,6 +40,38 @@ type AnchorIntent struct {
 	AnchorColor   color.Color
 }
 
+// PropagateIntent describes A2 side effects: write the anchor color to main's
+// .code-workspace, then write each derived color to the corresponding linked
+// worktree's .code-workspace. The runner executes the writes; resolve only
+// computes the targets and skip list.
+type PropagateIntent struct {
+	AnchorPath  string // ws(main)
+	AnchorColor color.Color
+	Targets     []PropagateTarget
+	Skipped     []SkippedLinked
+}
+
+// PropagateTarget is a linked worktree with its derived color.
+type PropagateTarget struct {
+	WorkspacePath string
+	DerivedColor  color.Color
+}
+
+// SkippedLinked is a linked worktree that was not in the family (no peacock
+// keys, no .code-workspace, parse error, etc.). The reason is short text
+// suitable for display.
+type SkippedLinked struct {
+	WorkspacePath string
+	Reason        string
+}
+
+// PropagateFailure is a linked worktree where the write attempt failed at
+// runtime (permission denied, disk full, etc.).
+type PropagateFailure struct {
+	WorkspacePath string
+	Err           error
+}
+
 // listWorktreesFn is the package-level injection point for the gitworktree.List
 // dependency. Tests reassign it (with cleanup) to inject fixture worktree slices.
 // Tests that reassign this var must not call t.Parallel().

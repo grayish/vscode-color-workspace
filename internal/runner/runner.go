@@ -13,6 +13,18 @@ import (
 	"github.com/sang-bin/vscode-color-workspace/internal/workspace"
 )
 
+// ErrPartialPropagation is returned by Run when A2 family propagation
+// completed with one or more linked write failures. The accompanying
+// *Result is populated; the caller should render Result.Warnings, then
+// surface this error to set exit code 1.
+var ErrPartialPropagation = errors.New("runner: family propagation had failures")
+
+// PropagateResult carries the outcome of writeFamilyPropagation.
+type PropagateResult struct {
+	Applied []string
+	Failed  []PropagateFailure
+}
+
 // GuardError indicates a safety guard triggered. Exit code 2.
 // Carries data only; presentation is the CLI layer's responsibility.
 type GuardError struct {
@@ -36,6 +48,9 @@ type Result struct {
 	Preconfigured   bool     // true when ws already had peacock keys and Force=false; nothing was written
 	PeacockKeys     []string // existing peacock keys detected on Preconfigured short-circuit (sorted, dotted paths)
 	Warnings        []string
+	PropagatedTo    []string           // A2: linked ws paths written successfully
+	SkippedLinked   []SkippedLinked    // A2: linked ws paths skipped (with reason)
+	FailedLinked    []PropagateFailure // A2: linked ws paths where write failed
 }
 
 // Runner orchestrates the full flow.
