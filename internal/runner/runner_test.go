@@ -437,6 +437,166 @@ func TestRun_NoPeacockKeys_MergeStillWorks(t *testing.T) {
 	}
 }
 
+func TestRun_A2_PropagatesToFamilyMembers(t *testing.T) {
+	base := t.TempDir()
+	mainPath := filepath.Join(base, "myproj")
+	feat := filepath.Join(base, "myproj-feat-x")
+	bug := filepath.Join(base, "myproj-bugfix")
+	for _, p := range []string{mainPath, feat, bug} {
+		if err := os.MkdirAll(p, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	mainWs := filepath.Join(base, "myproj.code-workspace")
+	featWs := filepath.Join(base, "myproj-feat-x.code-workspace")
+	bugWs := filepath.Join(base, "myproj-bugfix.code-workspace")
+	for _, p := range []string{mainWs, featWs, bugWs} {
+		if err := os.WriteFile(p, []byte(`{"settings":{"peacock.color":"#000000"}}`), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	withFakeWorktrees(t, []gitworktree.Worktree{
+		{Path: mainPath, GitDir: filepath.Join(mainPath, ".git"), IsMain: true},
+		{Path: feat, GitDir: filepath.Join(mainPath, ".git/worktrees/feat-x"), IsMain: false},
+		{Path: bug, GitDir: filepath.Join(mainPath, ".git/worktrees/bugfix"), IsMain: false},
+	}, nil)
+
+	opts := Defaults()
+	opts.TargetDir = mainPath
+	opts.NoOpen = true
+	opts.Force = true
+	opts.ColorInput = "#aabbcc"
+
+	res, err := New(&FakeOpener{}).Run(opts)
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if !strings.EqualFold(res.ColorHex, "#aabbcc") {
+		t.Errorf("ColorHex = %s, want #aabbcc", res.ColorHex)
+	}
+	if res.ColorSource != SourceWorktree {
+		t.Errorf("ColorSource = %v, want SourceWorktree", res.ColorSource)
+	}
+	if len(res.PropagatedTo) != 2 {
+		t.Errorf("PropagatedTo = %v, want 2", res.PropagatedTo)
+	}
+	// Verify both linked workspaces were written with derived (non-anchor) colors
+	for _, p := range []string{featWs, bugWs} {
+		body, err := os.ReadFile(p)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if strings.Contains(string(body), `"peacock.color":"#000000"`) {
+			t.Errorf("%s: peacock.color not updated; got %s", p, body)
+		}
+	}
+}
+
+func TestRun_A2_SkipsUncoloredLinked(t *testing.T) {
+	base := t.TempDir()
+	mainPath := filepath.Join(base, "myproj")
+	feat := filepath.Join(base, "myproj-feat-x")
+	hot := filepath.Join(base, "myproj-hotfix")
+	for _, p := range []string{mainPath, feat, hot} {
+		if err := os.MkdirAll(p, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	mainWs := filepath.Join(base, "myproj.code-workspace")
+	featWs := filepath.Join(base, "myproj-feat-x.code-workspace")
+	hotWs := filepath.Join(base, "myproj-hotfix.code-workspace")
+	for _, p := range []string{mainWs, featWs} {
+		if err := os.WriteFile(p, []byte(`{"settings":{"peacock.color":"#000000"}}`), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// hotfix has .code-workspace WITHOUT peacock keys
+	if err := os.WriteFile(hotWs, []byte(`{"folders":[{"path":"./myproj-hotfix"}]}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	hotBefore, _ := os.ReadFile(hotWs)
+
+	withFakeWorktrees(t, []gitworktree.Worktree{
+		{Path: mainPath, GitDir: filepath.Join(mainPath, ".git"), IsMain: true},
+		{Path: feat, GitDir: filepath.Join(mainPath, ".git/worktrees/feat-x"), IsMain: false},
+		{Path: hot, GitDir: filepath.Join(mainPath, ".git/worktrees/hotfix"), IsMain: false},
+	}, nil)
+
+	opts := Defaults()
+	opts.TargetDir = mainPath
+	opts.NoOpen = true
+	opts.Force = true
+	opts.ColorInput = "#aabbcc"
+
+	res, err := New(&FakeOpener{}).Run(opts)
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if len(res.SkippedLinked) != 1 || res.SkippedLinked[0].WorkspacePath != hotWs {
+		t.Errorf("SkippedLinked = %v, want hotfix", res.SkippedLinked)
+	}
+	hotAfter, _ := os.ReadFile(hotWs)
+	if string(hotBefore) != string(hotAfter) {
+		t.Errorf("hotfix .code-workspace was modified; expected untouched")
+	}
+}
+
+func TestRun_A2_PropagationPartialFailure_ReturnsErrPartial(t *testing.T) {
+	base := t.TempDir()
+	mainPath := filepath.Join(base, "myproj")
+	feat := filepath.Join(base, "myproj-feat-x")
+	bugDir := filepath.Join(base, "ro")
+	for _, p := range []string{mainPath, feat, bugDir} {
+		if err := os.MkdirAll(p, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	bug := filepath.Join(bugDir, "myproj-bugfix")
+	if err := os.MkdirAll(bug, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	mainWs := filepath.Join(base, "myproj.code-workspace")
+	featWs := filepath.Join(base, "myproj-feat-x.code-workspace")
+	bugWs := filepath.Join(bugDir, "myproj-bugfix.code-workspace")
+	for _, p := range []string{mainWs, featWs, bugWs} {
+		if err := os.WriteFile(p, []byte(`{"settings":{"peacock.color":"#000000"}}`), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// Make bug's parent dir read-only so the linked write fails
+	if err := os.Chmod(bugDir, 0o555); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(bugDir, 0o755) })
+
+	withFakeWorktrees(t, []gitworktree.Worktree{
+		{Path: mainPath, GitDir: filepath.Join(mainPath, ".git"), IsMain: true},
+		{Path: feat, GitDir: filepath.Join(mainPath, ".git/worktrees/feat-x"), IsMain: false},
+		{Path: bug, GitDir: filepath.Join(mainPath, ".git/worktrees/bugfix"), IsMain: false},
+	}, nil)
+
+	opts := Defaults()
+	opts.TargetDir = mainPath
+	opts.NoOpen = true
+	opts.Force = true
+	opts.ColorInput = "#aabbcc"
+
+	res, err := New(&FakeOpener{}).Run(opts)
+	if !errors.Is(err, ErrPartialPropagation) {
+		t.Fatalf("err = %v, want ErrPartialPropagation", err)
+	}
+	if res == nil {
+		t.Fatal("res = nil, want populated Result for warning rendering")
+	}
+	if len(res.FailedLinked) != 1 {
+		t.Errorf("FailedLinked = %v, want 1", res.FailedLinked)
+	}
+	if len(res.PropagatedTo) != 1 {
+		t.Errorf("PropagatedTo = %v, want 1 (feat succeeded)", res.PropagatedTo)
+	}
+}
+
 func TestWriteFamilyPropagation_AllSuccess(t *testing.T) {
 	base := t.TempDir()
 	mainWs := filepath.Join(base, "myproj.code-workspace")

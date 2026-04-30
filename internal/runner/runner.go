@@ -118,11 +118,25 @@ func (r *Runner) Run(opts Options) (*Result, error) {
 	if err != nil {
 		return nil, err
 	}
-	_ = propagateIntent // TODO(task-8): writeFamilyPropagation(propagateIntent, opts)
 	if anchorIntent != nil {
 		if err := writeAnchorWorkspace(anchorIntent, opts); err != nil {
 			return nil, fmt.Errorf("write main anchor workspace: %w", err)
 		}
+	}
+
+	var (
+		propagatedTo  []string
+		skippedLinked []SkippedLinked
+		failedLinked  []PropagateFailure
+	)
+	if propagateIntent != nil {
+		pres, perr := writeFamilyPropagation(propagateIntent, opts)
+		if perr != nil {
+			return nil, perr
+		}
+		propagatedTo = pres.Applied
+		skippedLinked = propagateIntent.Skipped
+		failedLinked = pres.Failed
 	}
 
 	settingsPath := filepath.Join(abs, ".vscode", "settings.json")
@@ -140,13 +154,15 @@ func (r *Runner) Run(opts Options) (*Result, error) {
 	palette := color.Palette(c, opts.Palette)
 	colorHex := c.Hex()
 
-	if ws == nil {
-		ws = &workspace.Workspace{}
-	}
-	workspace.EnsureFolder(ws, "./"+folderName)
-	workspace.ApplyPeacock(ws, colorHex, palette)
-	if err := workspace.Write(wsPath, ws); err != nil {
-		return nil, err
+	if propagateIntent == nil {
+		if ws == nil {
+			ws = &workspace.Workspace{}
+		}
+		workspace.EnsureFolder(ws, "./"+folderName)
+		workspace.ApplyPeacock(ws, colorHex, palette)
+		if err := workspace.Write(wsPath, ws); err != nil {
+			return nil, err
+		}
 	}
 
 	cleaned := false
@@ -164,6 +180,9 @@ func (r *Runner) Run(opts Options) (*Result, error) {
 		warnings = append(warnings,
 			fmt.Sprintf("parent directory %s is a git repository; workspace file may be committed", parent))
 	}
+	if propagateIntent != nil {
+		warnings = append(warnings, formatPropagatedWarning(propagateIntent, failedLinked))
+	}
 
 	if !opts.NoOpen {
 		if err := r.Opener.Open(wsPath); err != nil {
@@ -175,13 +194,20 @@ func (r *Runner) Run(opts Options) (*Result, error) {
 		}
 	}
 
-	return &Result{
+	result := &Result{
 		WorkspaceFile:   wsPath,
 		ColorHex:        colorHex,
 		ColorSource:     src,
 		SettingsCleaned: cleaned,
 		Warnings:        warnings,
-	}, nil
+		PropagatedTo:    propagatedTo,
+		SkippedLinked:   skippedLinked,
+		FailedLinked:    failedLinked,
+	}
+	if len(failedLinked) > 0 {
+		return result, ErrPartialPropagation
+	}
+	return result, nil
 }
 
 // CheckPreconfigured reports whether target/<...>.code-workspace already
