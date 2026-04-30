@@ -99,7 +99,7 @@ func (r *Runner) Run(opts Options) (*Result, error) {
 		}
 	}
 
-	c, src, resolveWarns, anchorIntent, err := ResolveColor(abs, opts.ColorInput, opts.Debug)
+	c, src, resolveWarns, anchorIntent, err := ResolveColor(abs, opts.ColorInput, opts.Force, opts.Debug)
 	if err != nil {
 		return nil, err
 	}

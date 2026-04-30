@@ -55,7 +55,7 @@ var listWorktreesFn = gitworktree.List
 // The fourth return is non-nil only for Case C (auto-establish), where the
 // caller must write the anchor color into the main worktree's .code-workspace.
 // When debug is true, branch-by-branch diagnostics are written to stderr.
-func ResolveColor(targetDir, flag string, debug bool) (color.Color, ColorSource, []string, *AnchorIntent, error) {
+func ResolveColor(targetDir, flag string, force, debug bool) (color.Color, ColorSource, []string, *AnchorIntent, error) {
 	dbg(debug, "ResolveColor: targetDir=%q flag=%q", targetDir, flag)
 	if flag != "" {
 		c, err := color.Parse(flag)
@@ -66,7 +66,7 @@ func ResolveColor(targetDir, flag string, debug bool) (color.Color, ColorSource,
 		return c, SourceFlag, nil, nil, nil
 	}
 
-	c, src, warns, intent, ok, err := resolveFromWorktree(targetDir, debug)
+	c, src, warns, intent, ok, err := resolveFromWorktree(targetDir, flag, force, debug)
 	if err != nil {
 		return color.Color{}, 0, nil, nil, err
 	}
@@ -123,7 +123,7 @@ func readWorkspacePeacockColor(path string) (*color.Color, error) {
 //	ok=true  → color decided by worktree logic; caller uses (c, src, warns, intent)
 //	ok=false → fall through to settings/random; warns may carry a Case-D notice
 //	err!=nil → hard error (e.g., file write failure for AnchorIntent)
-func resolveFromWorktree(targetDir string, debug bool) (color.Color, ColorSource, []string, *AnchorIntent, bool, error) {
+func resolveFromWorktree(targetDir, flag string, force, debug bool) (color.Color, ColorSource, []string, *AnchorIntent, bool, error) {
 	dbg(debug, "resolveFromWorktree: targetDir=%q", targetDir)
 	worktrees, err := listWorktreesFn(targetDir)
 	if errors.Is(err, gitworktree.ErrNotInWorktree) {
