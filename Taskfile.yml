@@ -55,20 +55,10 @@ tasks:
     cmds:
       - go test -tags=integration -count=1 ./...
 
-  vet:
-    desc: Run go vet
-    cmds:
-      - go vet ./...
-
   fmt:
     desc: Format Go code (gofmt -s + goimports via golangci-lint)
     cmds:
       - go tool golangci-lint fmt
-
-  fmt:check:
-    desc: Fail if any files need formatting
-    cmds:
-      - go tool golangci-lint fmt --diff
 
   tidy:
     desc: Run go mod tidy
@@ -79,7 +69,7 @@ tasks:
     desc: Run golangci-lint (linters + format check)
     cmds:
       - go tool golangci-lint run
-      - task: fmt:check
+      - go tool golangci-lint fmt --diff
 
   fixture:
     desc: Regenerate Peacock golden fixture from JS reference
