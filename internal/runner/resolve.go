@@ -281,6 +281,58 @@ func findLinkedWithColor(worktrees []gitworktree.Worktree, self *gitworktree.Wor
 	return nil, nil, nil
 }
 
+// buildPropagateTargets classifies every linked worktree into either a
+// PropagateTarget (will be written) or a SkippedLinked entry (skipped with
+// a short reason). The main worktree is excluded from both lists. The anchor
+// color is what the caller has decided to apply to main.
+func buildPropagateTargets(worktrees []gitworktree.Worktree, anchor color.Color) ([]PropagateTarget, []SkippedLinked) {
+	var targets []PropagateTarget
+	var skipped []SkippedLinked
+	for i := range worktrees {
+		w := &worktrees[i]
+		if w.IsMain {
+			continue
+		}
+		wsPath, err := workspaceFilePath(w.Path)
+		if err != nil {
+			skipped = append(skipped, SkippedLinked{
+				WorkspacePath: w.Path,
+				Reason:        "could not derive workspace path: " + err.Error(),
+			})
+			continue
+		}
+		ws, err := workspace.Read(wsPath)
+		if err != nil {
+			skipped = append(skipped, SkippedLinked{
+				WorkspacePath: wsPath,
+				Reason:        "parse error: " + err.Error(),
+			})
+			continue
+		}
+		if ws == nil {
+			skipped = append(skipped, SkippedLinked{
+				WorkspacePath: wsPath,
+				Reason:        "no .code-workspace",
+			})
+			continue
+		}
+		if len(workspace.ExistingPeacockKeys(ws)) == 0 {
+			skipped = append(skipped, SkippedLinked{
+				WorkspacePath: wsPath,
+				Reason:        "no peacock keys",
+			})
+			continue
+		}
+		offset := color.LadderOffset(gitworktree.IdentityHash(*w))
+		derived := anchor.ApplyLightness(offset)
+		targets = append(targets, PropagateTarget{
+			WorkspacePath: wsPath,
+			DerivedColor:  derived,
+		})
+	}
+	return targets, skipped
+}
+
 func formatFamilyDisabledWarning(linked *gitworktree.Worktree, linkedColor *color.Color, main gitworktree.Worktree, mainWsPath string) string {
 	return fmt.Sprintf(
 		"worktree family disabled\n"+

@@ -300,6 +300,95 @@ func TestResolveColor_WorktreeCaseB_MainTargetNoColor(t *testing.T) {
 	}
 }
 
+func TestBuildPropagateTargets_SkipsMainAndUncolored(t *testing.T) {
+	base := t.TempDir()
+	mainPath := filepath.Join(base, "myproj")
+	feat := filepath.Join(base, "myproj-feat-x")
+	bug := filepath.Join(base, "myproj-bugfix")
+	hot := filepath.Join(base, "myproj-hotfix")
+	for _, p := range []string{mainPath, feat, bug, hot} {
+		if err := os.MkdirAll(p, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// feat: in family (peacock.color present)
+	writeWorkspaceWithColor(t, filepath.Join(base, "myproj-feat-x.code-workspace"), "#7a5bac")
+	// bug: in family (peacock.color present)
+	writeWorkspaceWithColor(t, filepath.Join(base, "myproj-bugfix.code-workspace"), "#4a2b6c")
+	// hot: .code-workspace exists but no peacock keys — should be skipped
+	if err := os.WriteFile(filepath.Join(base, "myproj-hotfix.code-workspace"),
+		[]byte(`{"folders":[{"path":"./myproj-hotfix"}]}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	worktrees := []gitworktree.Worktree{
+		{Path: mainPath, GitDir: filepath.Join(mainPath, ".git"), IsMain: true},
+		{Path: feat, GitDir: filepath.Join(mainPath, ".git/worktrees/feat-x"), IsMain: false},
+		{Path: bug, GitDir: filepath.Join(mainPath, ".git/worktrees/bugfix"), IsMain: false},
+		{Path: hot, GitDir: filepath.Join(mainPath, ".git/worktrees/hotfix"), IsMain: false},
+	}
+	anchor := color.Color{R: 0xaa, G: 0xbb, B: 0xcc}
+
+	targets, skipped := buildPropagateTargets(worktrees, anchor)
+
+	if len(targets) != 2 {
+		t.Fatalf("targets count = %d, want 2 (feat, bug); got %v", len(targets), targets)
+	}
+	gotPaths := map[string]bool{}
+	for _, tgt := range targets {
+		gotPaths[tgt.WorkspacePath] = true
+		if tgt.DerivedColor == anchor {
+			t.Errorf("derived color = anchor for %s; expected non-zero offset", tgt.WorkspacePath)
+		}
+	}
+	if !gotPaths[filepath.Join(base, "myproj-feat-x.code-workspace")] {
+		t.Errorf("missing feat-x in targets")
+	}
+	if !gotPaths[filepath.Join(base, "myproj-bugfix.code-workspace")] {
+		t.Errorf("missing bugfix in targets")
+	}
+
+	if len(skipped) != 1 {
+		t.Fatalf("skipped count = %d, want 1 (hotfix); got %v", len(skipped), skipped)
+	}
+	if skipped[0].WorkspacePath != filepath.Join(base, "myproj-hotfix.code-workspace") {
+		t.Errorf("skipped path = %s, want hotfix", skipped[0].WorkspacePath)
+	}
+	if skipped[0].Reason == "" {
+		t.Errorf("skipped reason is empty")
+	}
+}
+
+func TestBuildPropagateTargets_SkipsMissingWorkspaceFile(t *testing.T) {
+	base := t.TempDir()
+	mainPath := filepath.Join(base, "myproj")
+	feat := filepath.Join(base, "myproj-feat-x")
+	for _, p := range []string{mainPath, feat} {
+		if err := os.MkdirAll(p, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// feat has NO .code-workspace file at all
+
+	worktrees := []gitworktree.Worktree{
+		{Path: mainPath, GitDir: filepath.Join(mainPath, ".git"), IsMain: true},
+		{Path: feat, GitDir: filepath.Join(mainPath, ".git/worktrees/feat-x"), IsMain: false},
+	}
+	anchor := color.Color{R: 0xaa, G: 0xbb, B: 0xcc}
+
+	targets, skipped := buildPropagateTargets(worktrees, anchor)
+
+	if len(targets) != 0 {
+		t.Errorf("targets = %v, want empty", targets)
+	}
+	if len(skipped) != 1 {
+		t.Fatalf("skipped count = %d, want 1", len(skipped))
+	}
+	if !strings.Contains(skipped[0].Reason, "no .code-workspace") {
+		t.Errorf("skipped reason = %q, want substring 'no .code-workspace'", skipped[0].Reason)
+	}
+}
+
 func TestResolveColor_WorktreeCaseC_LinkedFirst_ReturnsIntent(t *testing.T) {
 	base := t.TempDir()
 	mainPath := filepath.Join(base, "myproj")
