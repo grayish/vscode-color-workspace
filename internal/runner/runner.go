@@ -119,7 +119,7 @@ func (r *Runner) Run(opts Options) (*Result, error) {
 		return nil, err
 	}
 	if anchorIntent != nil {
-		if err := writeAnchorWorkspace(anchorIntent, opts); err != nil {
+		if err := writeOneWorkspace(anchorIntent.WorkspacePath, anchorIntent.AnchorColor, opts); err != nil {
 			return nil, fmt.Errorf("write main anchor workspace: %w", err)
 		}
 	}
@@ -257,14 +257,6 @@ func isGitRepo(dir string) bool {
 	return err == nil
 }
 
-// writeAnchorWorkspace materialises an AnchorIntent: read or create the main
-// worktree's .code-workspace, merge in the peacock palette derived from the
-// anchor color, and write it back. Does NOT touch main's .vscode/settings.json
-// — that side effect would be invasive on a directory the user did not target.
-func writeAnchorWorkspace(intent *AnchorIntent, opts Options) error {
-	return writeOneWorkspace(intent.WorkspacePath, intent.AnchorColor, opts)
-}
-
 // writeFamilyPropagation executes the writes described by a PropagateIntent.
 // Main is written first; if that fails the function returns a hard error
 // without attempting any linked writes. Otherwise, every linked target is
@@ -289,8 +281,9 @@ func writeFamilyPropagation(intent *PropagateIntent, opts Options) (PropagateRes
 }
 
 // writeOneWorkspace reads (or creates) the workspace at path, applies the
-// peacock palette derived from c, and writes it back. Used by both
-// writeAnchorWorkspace (Case C) and writeFamilyPropagation (A2).
+// peacock palette derived from c, and writes it back. Used for Case C anchor
+// auto-creation and for A2 family propagation; does NOT touch the worktree's
+// .vscode/settings.json (invasive on a directory the user did not target).
 func writeOneWorkspace(path string, c color.Color, opts Options) error {
 	ws, err := workspace.Read(path)
 	if err != nil {

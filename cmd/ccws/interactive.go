@@ -90,12 +90,7 @@ func runInteractive(args []string) error {
 	for attempt := 0; attempt < 2; attempt++ {
 		res, err := runner.New(nil).Run(opts)
 		if err == nil {
-			if res.Preconfigured {
-				renderPreconfigured(tui.NewStderr(), res)
-			} else {
-				renderSuccess(tui.NewStdout(), res, "")
-			}
-			renderWarnings(tui.NewStderr(), res.Warnings)
+			renderInteractiveResult(res)
 			return nil
 		}
 		var ge *runner.GuardError
@@ -103,13 +98,8 @@ func runInteractive(args []string) error {
 			if !errors.Is(err, runner.ErrPartialPropagation) {
 				return err
 			}
-			// ErrPartialPropagation: res is populated; render then propagate
-			if res.Preconfigured {
-				renderPreconfigured(tui.NewStderr(), res)
-			} else {
-				renderSuccess(tui.NewStdout(), res, "")
-			}
-			renderWarnings(tui.NewStderr(), res.Warnings)
+			// ErrPartialPropagation: res is populated; render then propagate.
+			renderInteractiveResult(res)
 			return err
 		}
 		if attempt > 0 {
@@ -125,6 +115,15 @@ func runInteractive(args []string) error {
 		opts.Force = true
 	}
 	return nil
+}
+
+func renderInteractiveResult(res *runner.Result) {
+	if res.Preconfigured {
+		renderPreconfigured(tui.NewStderr(), res)
+	} else {
+		renderSuccess(tui.NewStdout(), res, "")
+	}
+	renderWarnings(tui.NewStderr(), res.Warnings)
 }
 
 func confirmGuard(ge *runner.GuardError) (bool, error) {

@@ -92,16 +92,16 @@ var listWorktreesFn = gitworktree.List
 func ResolveColor(targetDir, flag string, force, debug bool) (color.Color, ColorSource, []string, *AnchorIntent, *PropagateIntent, error) {
 	dbg(debug, "ResolveColor: targetDir=%q flag=%q force=%v", targetDir, flag, force)
 
-	var parsedFlag color.Color
+	var flagColor *color.Color
 	if flag != "" {
 		p, err := color.Parse(flag)
 		if err != nil {
 			return color.Color{}, 0, nil, nil, nil, fmt.Errorf("--color: %w", err)
 		}
-		parsedFlag = p
+		flagColor = &p
 	}
 
-	c, src, warns, anchorIntent, propagateIntent, ok, err := resolveFromWorktree(targetDir, flag, force, debug)
+	c, src, warns, anchorIntent, propagateIntent, ok, err := resolveFromWorktree(targetDir, flagColor, force, debug)
 	if err != nil {
 		return color.Color{}, 0, nil, nil, nil, err
 	}
@@ -111,9 +111,9 @@ func ResolveColor(targetDir, flag string, force, debug bool) (color.Color, Color
 	}
 	dbg(debug, "ResolveColor: worktree logic skipped — falling through")
 
-	if flag != "" {
-		dbg(debug, "ResolveColor: source=Flag color=%s", parsedFlag.Hex())
-		return parsedFlag, SourceFlag, warns, nil, nil, nil
+	if flagColor != nil {
+		dbg(debug, "ResolveColor: source=Flag color=%s", flagColor.Hex())
+		return *flagColor, SourceFlag, warns, nil, nil, nil
 	}
 
 	// fall through to settings.json → random — preserve any Case-D warnings
@@ -163,7 +163,7 @@ func readWorkspacePeacockColor(path string) (*color.Color, error) {
 //	ok=true  → color decided by worktree logic; caller uses (c, src, warns, anchorIntent, propagateIntent)
 //	ok=false → fall through to settings/random; warns may carry a Case-D notice
 //	err!=nil → hard error (e.g., file write failure for AnchorIntent)
-func resolveFromWorktree(targetDir, flag string, force, debug bool) (color.Color, ColorSource, []string, *AnchorIntent, *PropagateIntent, bool, error) {
+func resolveFromWorktree(targetDir string, flagColor *color.Color, force, debug bool) (color.Color, ColorSource, []string, *AnchorIntent, *PropagateIntent, bool, error) {
 	dbg(debug, "resolveFromWorktree: targetDir=%q", targetDir)
 	worktrees, err := listWorktreesFn(targetDir)
 	if errors.Is(err, gitworktree.ErrNotInWorktree) {
@@ -209,15 +209,9 @@ func resolveFromWorktree(targetDir, flag string, force, debug bool) (color.Color
 	// Case A2: target is main of a multi-worktree repo and --force given.
 	// Regenerate anchor and propagate to all colored linked worktrees.
 	if mainColor != nil && self.IsMain && len(worktrees) > 1 && force {
-		var anchor color.Color
-		if flag != "" {
-			parsed, perr := color.Parse(flag)
-			if perr != nil {
-				return color.Color{}, 0, nil, nil, nil, false, fmt.Errorf("--color: %w", perr)
-			}
-			anchor = parsed
-		} else {
-			anchor = color.Random()
+		anchor := color.Random()
+		if flagColor != nil {
+			anchor = *flagColor
 		}
 		targets, skipped := buildPropagateTargets(worktrees, anchor)
 		intent := &PropagateIntent{
@@ -230,16 +224,16 @@ func resolveFromWorktree(targetDir, flag string, force, debug bool) (color.Color
 		return anchor, SourceWorktree, nil, nil, intent, true, nil
 	}
 
-	// Case A: main has a color — anchor + offset (A3 in spec terminology)
+	// Case A3: target is a linked worktree and main has a color — apply offset.
 	if mainColor != nil {
-		if flag != "" {
-			// --color flag bypasses worktree logic for non-A2 paths
-			dbg(debug, "  Case A: flag set, skipping worktree derivation")
+		if flagColor != nil {
+			// --color bypasses worktree logic for non-A2 paths.
+			dbg(debug, "  Case A3: flag set, skipping worktree derivation")
 			return color.Color{}, 0, nil, nil, nil, false, nil
 		}
 		offset := color.LadderOffset(gitworktree.IdentityHash(*self))
 		derived := mainColor.ApplyLightness(offset)
-		dbg(debug, "  Case A: mainColor=%s offset=%v derived=%s", mainColor.Hex(), offset, derived.Hex())
+		dbg(debug, "  Case A3: mainColor=%s offset=%v derived=%s", mainColor.Hex(), offset, derived.Hex())
 		return derived, SourceWorktree, nil, nil, nil, true, nil
 	}
 	dbg(debug, "  main worktree has no peacock.color (or wsfile missing): %s", mainWsPath)
@@ -268,8 +262,8 @@ func resolveFromWorktree(targetDir, flag string, force, debug bool) (color.Color
 	// Case C: target is linked, no other worktree has color — auto-establish
 	// main as the family anchor with a random color. The runner executes
 	// the side effect (writeAnchorWorkspace) using the returned AnchorIntent.
-	if flag != "" {
-		// --color flag bypasses worktree logic for non-A2 paths
+	if flagColor != nil {
+		// --color bypasses worktree logic for non-A2 paths.
 		dbg(debug, "  Case C: flag set, skipping anchor auto-creation")
 		return color.Color{}, 0, nil, nil, nil, false, nil
 	}
