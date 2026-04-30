@@ -154,6 +154,9 @@ func (r *Runner) Run(opts Options) (*Result, error) {
 	palette := color.Palette(c, opts.Palette)
 	colorHex := c.Hex()
 
+	// When propagateIntent is non-nil (A2), writeFamilyPropagation has
+	// already written main's .code-workspace via intent.AnchorPath, which
+	// equals wsPath. Skip this block to avoid a redundant second write.
 	if propagateIntent == nil {
 		if ws == nil {
 			ws = &workspace.Workspace{}
@@ -204,6 +207,9 @@ func (r *Runner) Run(opts Options) (*Result, error) {
 		SkippedLinked:   skippedLinked,
 		FailedLinked:    failedLinked,
 	}
+	// Partial-propagation pattern: return populated Result with
+	// ErrPartialPropagation sentinel so the CLI can render warnings
+	// before mapping the error to exit 1. See ErrPartialPropagation doc.
 	if len(failedLinked) > 0 {
 		return result, ErrPartialPropagation
 	}
