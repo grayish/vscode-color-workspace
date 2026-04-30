@@ -100,6 +100,16 @@ func runInteractive(args []string) error {
 		}
 		var ge *runner.GuardError
 		if !errors.As(err, &ge) {
+			if !errors.Is(err, runner.ErrPartialPropagation) {
+				return err
+			}
+			// ErrPartialPropagation: res is populated; render then propagate
+			if res.Preconfigured {
+				renderPreconfigured(tui.NewStderr(), res)
+			} else {
+				renderSuccess(tui.NewStdout(), res, "")
+			}
+			renderWarnings(tui.NewStderr(), res.Warnings)
 			return err
 		}
 		if attempt > 0 {

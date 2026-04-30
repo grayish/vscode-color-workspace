@@ -661,3 +661,78 @@ func TestFormatPropagatedWarning_NoLinkedInFamily(t *testing.T) {
 		t.Errorf("warning missing empty-family hint\n%s", got)
 	}
 }
+
+func TestResolveColor_FlagOverridesA3(t *testing.T) {
+	base := t.TempDir()
+	mainPath := filepath.Join(base, "myproj")
+	feat := filepath.Join(base, "myproj-feat-x")
+	for _, p := range []string{mainPath, feat} {
+		if err := os.MkdirAll(p, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	writeWorkspaceWithColor(t, filepath.Join(base, "myproj.code-workspace"), "#5a3b8c")
+
+	withFakeWorktrees(t, []gitworktree.Worktree{
+		{Path: mainPath, GitDir: filepath.Join(mainPath, ".git"), IsMain: true},
+		{Path: feat, GitDir: filepath.Join(mainPath, ".git/worktrees/feat-x"), IsMain: false},
+	}, nil)
+
+	c, src, _, anchor, propagate, err := ResolveColor(feat, "#aabbcc", false, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if src != SourceFlag {
+		t.Errorf("source = %v, want SourceFlag (--color must override A3)", src)
+	}
+	want := color.Color{R: 0xaa, G: 0xbb, B: 0xcc}
+	if c != want {
+		t.Errorf("color = %v, want %v (--color value)", c, want)
+	}
+	if anchor != nil {
+		t.Errorf("anchor = %v, want nil", anchor)
+	}
+	if propagate != nil {
+		t.Errorf("propagate = %v, want nil", propagate)
+	}
+}
+
+func TestResolveColor_FlagOverridesCaseC(t *testing.T) {
+	base := t.TempDir()
+	mainPath := filepath.Join(base, "myproj")
+	feat := filepath.Join(base, "myproj-feat-x")
+	for _, p := range []string{mainPath, feat} {
+		if err := os.MkdirAll(p, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// Neither main nor feat has a .code-workspace
+
+	withFakeWorktrees(t, []gitworktree.Worktree{
+		{Path: mainPath, GitDir: filepath.Join(mainPath, ".git"), IsMain: true},
+		{Path: feat, GitDir: filepath.Join(mainPath, ".git/worktrees/feat-x"), IsMain: false},
+	}, nil)
+
+	c, src, _, anchor, propagate, err := ResolveColor(feat, "#aabbcc", false, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if src != SourceFlag {
+		t.Errorf("source = %v, want SourceFlag (--color must override Case C)", src)
+	}
+	want := color.Color{R: 0xaa, G: 0xbb, B: 0xcc}
+	if c != want {
+		t.Errorf("color = %v, want %v (--color value)", c, want)
+	}
+	if anchor != nil {
+		t.Errorf("anchor = %v, want nil (no auto-establish under --color)", anchor)
+	}
+	if propagate != nil {
+		t.Errorf("propagate = %v, want nil", propagate)
+	}
+	// Verify main's .code-workspace was NOT created
+	mainWs := filepath.Join(base, "myproj.code-workspace")
+	if _, err := os.Stat(mainWs); err == nil {
+		t.Errorf("main .code-workspace should NOT exist under --color, but it does")
+	}
+}

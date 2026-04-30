@@ -232,6 +232,11 @@ func resolveFromWorktree(targetDir, flag string, force, debug bool) (color.Color
 
 	// Case A: main has a color — anchor + offset (A3 in spec terminology)
 	if mainColor != nil {
+		if flag != "" {
+			// --color flag bypasses worktree logic for non-A2 paths
+			dbg(debug, "  Case A: flag set, skipping worktree derivation")
+			return color.Color{}, 0, nil, nil, nil, false, nil
+		}
 		offset := color.LadderOffset(gitworktree.IdentityHash(*self))
 		derived := mainColor.ApplyLightness(offset)
 		dbg(debug, "  Case A: mainColor=%s offset=%v derived=%s", mainColor.Hex(), offset, derived.Hex())
@@ -263,6 +268,11 @@ func resolveFromWorktree(targetDir, flag string, force, debug bool) (color.Color
 	// Case C: target is linked, no other worktree has color — auto-establish
 	// main as the family anchor with a random color. The runner executes
 	// the side effect (writeAnchorWorkspace) using the returned AnchorIntent.
+	if flag != "" {
+		// --color flag bypasses worktree logic for non-A2 paths
+		dbg(debug, "  Case C: flag set, skipping anchor auto-creation")
+		return color.Color{}, 0, nil, nil, nil, false, nil
+	}
 	anchor := color.Random()
 	anchorIntent := &AnchorIntent{
 		WorkspacePath: mainWsPath,
