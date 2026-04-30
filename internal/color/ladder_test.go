@@ -2,14 +2,6 @@ package color
 
 import "testing"
 
-func TestLadderSteps_NoZero(t *testing.T) {
-	for _, s := range LadderSteps {
-		if s == 0 {
-			t.Fatal("LadderSteps must not contain 0; that slot is reserved for main worktree")
-		}
-	}
-}
-
 func TestLadderOffset_ZeroHashIsZero(t *testing.T) {
 	if got := LadderOffset(0); got != 0 {
 		t.Errorf("LadderOffset(0) = %v, want 0", got)
@@ -17,14 +9,50 @@ func TestLadderOffset_ZeroHashIsZero(t *testing.T) {
 }
 
 func TestLadderOffset_NonZeroInRange(t *testing.T) {
-	allowed := map[float64]bool{}
-	for _, s := range LadderSteps {
-		allowed[s] = true
-	}
-	for hash := uint64(1); hash < 1000; hash++ {
+	for hash := uint64(1); hash <= 1000; hash++ {
 		got := LadderOffset(hash)
-		if !allowed[got] {
-			t.Fatalf("LadderOffset(%d) = %v, not in %v", hash, got, LadderSteps)
+		if got == 0 {
+			t.Fatalf("LadderOffset(%d) = 0; 0 is reserved for the main worktree", hash)
+		}
+		n := int(got)
+		if float64(n) != got {
+			t.Fatalf("LadderOffset(%d) = %v; want integer", hash, got)
+		}
+		if n < -LadderRange || n > LadderRange {
+			t.Fatalf("LadderOffset(%d) = %d; want in [-%d, %d]", hash, n, LadderRange, LadderRange)
+		}
+	}
+}
+
+func TestLadderOffset_AllValuesReachable(t *testing.T) {
+	seen := map[float64]bool{}
+	for hash := uint64(1); hash <= 1000; hash++ {
+		seen[LadderOffset(hash)] = true
+	}
+	want := 2 * LadderRange // 14: ±1..±7 excluding 0
+	if len(seen) != want {
+		t.Errorf("got %d distinct offsets, want %d", len(seen), want)
+	}
+	for n := -LadderRange; n <= LadderRange; n++ {
+		if n == 0 {
+			continue
+		}
+		if !seen[float64(n)] {
+			t.Errorf("offset %d never reached over hash 1..1000", n)
+		}
+	}
+}
+
+func TestLadderOffset_Distribution(t *testing.T) {
+	counts := map[float64]int{}
+	const N = 1000
+	for hash := uint64(1); hash <= N; hash++ {
+		counts[LadderOffset(hash)]++
+	}
+	// Expected per bucket: 1000/14 ≈ 71. Allow [50, 100] (~30% slack).
+	for off, c := range counts {
+		if c < 50 || c > 100 {
+			t.Errorf("offset %v: %d hits in 1000-sweep, want in [50, 100]", off, c)
 		}
 	}
 }
@@ -45,7 +73,6 @@ func TestApplyLightness_PositiveLightens(t *testing.T) {
 	if lighter == base {
 		t.Error("ApplyLightness(+10) returned base unchanged")
 	}
-	// crude sanity: lighter color has higher channel sum
 	if int(lighter.R)+int(lighter.G)+int(lighter.B) <= int(base.R)+int(base.G)+int(base.B) {
 		t.Errorf("ApplyLightness(+10) did not lighten: base=%v lighter=%v", base, lighter)
 	}
