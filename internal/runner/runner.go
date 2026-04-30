@@ -230,16 +230,46 @@ func isGitRepo(dir string) bool {
 // anchor color, and write it back. Does NOT touch main's .vscode/settings.json
 // — that side effect would be invasive on a directory the user did not target.
 func writeAnchorWorkspace(intent *AnchorIntent, opts Options) error {
-	ws, err := workspace.Read(intent.WorkspacePath)
+	return writeOneWorkspace(intent.WorkspacePath, intent.AnchorColor, opts)
+}
+
+// writeFamilyPropagation executes the writes described by a PropagateIntent.
+// Main is written first; if that fails the function returns a hard error
+// without attempting any linked writes. Otherwise, every linked target is
+// attempted; failures are collected into PropagateResult.Failed and do not
+// abort the loop.
+func writeFamilyPropagation(intent *PropagateIntent, opts Options) (PropagateResult, error) {
+	if err := writeOneWorkspace(intent.AnchorPath, intent.AnchorColor, opts); err != nil {
+		return PropagateResult{}, fmt.Errorf("write main anchor workspace: %w", err)
+	}
+	var res PropagateResult
+	for _, tgt := range intent.Targets {
+		if err := writeOneWorkspace(tgt.WorkspacePath, tgt.DerivedColor, opts); err != nil {
+			res.Failed = append(res.Failed, PropagateFailure{
+				WorkspacePath: tgt.WorkspacePath,
+				Err:           err,
+			})
+			continue
+		}
+		res.Applied = append(res.Applied, tgt.WorkspacePath)
+	}
+	return res, nil
+}
+
+// writeOneWorkspace reads (or creates) the workspace at path, applies the
+// peacock palette derived from c, and writes it back. Used by both
+// writeAnchorWorkspace (Case C) and writeFamilyPropagation (A2).
+func writeOneWorkspace(path string, c color.Color, opts Options) error {
+	ws, err := workspace.Read(path)
 	if err != nil {
 		return err
 	}
 	if ws == nil {
 		ws = &workspace.Workspace{}
 	}
-	folderName := strings.TrimSuffix(filepath.Base(intent.WorkspacePath), ".code-workspace")
+	folderName := strings.TrimSuffix(filepath.Base(path), ".code-workspace")
 	workspace.EnsureFolder(ws, "./"+folderName)
-	palette := color.Palette(intent.AnchorColor, opts.Palette)
-	workspace.ApplyPeacock(ws, intent.AnchorColor.Hex(), palette)
-	return workspace.Write(intent.WorkspacePath, ws)
+	palette := color.Palette(c, opts.Palette)
+	workspace.ApplyPeacock(ws, c.Hex(), palette)
+	return workspace.Write(path, ws)
 }
