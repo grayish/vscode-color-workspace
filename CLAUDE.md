@@ -10,7 +10,7 @@ task build            # → ./ccws
 task install          # → $GOBIN/ccws
 task test:race        # race detector
 task test:integration # gitworktree integration tests (needs git on PATH)
-task lint             # vet + gofmt check (CI runs this)
+task lint             # golangci-lint (errcheck, govet, ineffassign, staticcheck, unused + gofmt/goimports check) — CI runs this
 task ci               # lint + test:race
 task fixture          # regenerate golden fixture (needs Node)
 task --list           # full target list

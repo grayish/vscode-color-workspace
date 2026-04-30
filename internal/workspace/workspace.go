@@ -157,11 +157,11 @@ func atomicWrite(path string, data []byte, mode os.FileMode) error {
 		}
 	}()
 	if _, err := io.Copy(tmp, bytes.NewReader(data)); err != nil {
-		tmp.Close()
+		_ = tmp.Close()
 		return fmt.Errorf("atomic write: copy: %w", err)
 	}
 	if err := tmp.Sync(); err != nil {
-		tmp.Close()
+		_ = tmp.Close()
 		return fmt.Errorf("atomic write: sync: %w", err)
 	}
 	if err := tmp.Close(); err != nil {

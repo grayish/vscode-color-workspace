@@ -37,7 +37,7 @@ func NewStderr() *Writer {
 }
 
 // Newline writes a single blank line. Used between adjacent badge blocks.
-func (w *Writer) Newline() { fmt.Fprintln(w.out) }
+func (w *Writer) Newline() { _, _ = fmt.Fprintln(w.out) }
 
 func shouldColor(fd uintptr) bool {
 	if os.Getenv("NO_COLOR") != "" {
@@ -96,7 +96,7 @@ func (w *Writer) Error(title string) { w.badge(styleError, "error", title) }
 
 func (w *Writer) badge(style lipgloss.Style, label, title string) {
 	cell := w.renderBadge(style, label)
-	fmt.Fprintf(w.out, "%s%s%s%s\n", leadingIndent, cell, badgeSeparator, title)
+	_, _ = fmt.Fprintf(w.out, "%s%s%s%s\n", leadingIndent, cell, badgeSeparator, title)
 }
 
 // renderBadge returns the badge cell, padded to badgeWidth.
@@ -120,9 +120,9 @@ type Detail struct {
 func (w *Writer) Details(rows []Detail) {
 	for _, r := range rows {
 		if r.Value == "" {
-			fmt.Fprintf(w.out, "%s%s\n", continuationIndent, r.Label)
+			_, _ = fmt.Fprintf(w.out, "%s%s\n", continuationIndent, r.Label)
 		} else {
-			fmt.Fprintf(w.out, "%s%s  %s\n", continuationIndent, r.Label, r.Value)
+			_, _ = fmt.Fprintf(w.out, "%s%s  %s\n", continuationIndent, r.Label, r.Value)
 		}
 	}
 }
@@ -140,10 +140,10 @@ func (w *Writer) Bullets(items []string, limit int) {
 		shown = items[:limit]
 	}
 	for _, it := range shown {
-		fmt.Fprintf(w.out, "%s• %s\n", bulletIndent, it)
+		_, _ = fmt.Fprintf(w.out, "%s• %s\n", bulletIndent, it)
 	}
 	if truncated {
-		fmt.Fprintf(w.out, "%s…(%d more)\n", bulletIndent, len(items)-limit)
+		_, _ = fmt.Fprintf(w.out, "%s…(%d more)\n", bulletIndent, len(items)-limit)
 	}
 }
 

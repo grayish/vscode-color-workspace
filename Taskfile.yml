@@ -61,14 +61,14 @@ tasks:
       - go vet ./...
 
   fmt:
-    desc: Format Go code (gofmt -s)
+    desc: Format Go code (gofmt -s + goimports via golangci-lint)
     cmds:
-      - gofmt -w -s .
+      - go tool golangci-lint fmt
 
   fmt:check:
-    desc: Fail if any files are not gofmt'd
+    desc: Fail if any files need formatting
     cmds:
-      - test -z "$(gofmt -l .)"
+      - go tool golangci-lint fmt --diff
 
   tidy:
     desc: Run go mod tidy
@@ -76,9 +76,9 @@ tasks:
       - go mod tidy
 
   lint:
-    desc: Run vet + gofmt check
+    desc: Run golangci-lint (linters + format check)
     cmds:
-      - task: vet
+      - go tool golangci-lint run
       - task: fmt:check
 
   fixture:
