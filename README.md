@@ -39,7 +39,7 @@ Running `ccws` in `/home/me/code/myproj` will:
 
 1. Resolve the color (explicit `--color` > `peacock.color` from `.vscode/settings.json` > random).
 2. Generate the Peacock palette (activityBar / statusBar / titleBar by default).
-3. Write `/home/me/code/myproj.code-workspace` (merging peacock keys into any existing file). **If the workspace file already contains peacock keys, ccws skips the write, prints a warning, and just opens it. Pass `--force` to overwrite.**
+3. Write `/home/me/code/myproj.code-workspace` (merging peacock keys into any existing file). **If the workspace file already contains peacock keys, ccws skips the write, prints a warning, and just opens it. Pass `--force` to overwrite.** When run on a git **main** worktree with `--force`, ccws also propagates the anchor color to every linked worktree's `.code-workspace` that already has peacock keys (linked workspaces without peacock keys are skipped). Linked workspaces that fail to write are reported and exit code 1 is returned.
 4. Clean up `peacock.*` keys and the peacock-managed subset of `workbench.colorCustomizations` from `/home/me/code/myproj/.vscode/settings.json`. If the settings file becomes empty it's deleted, along with an empty `.vscode/` directory.
 5. Launch `code <workspace-file>`.
 
