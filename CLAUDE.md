@@ -6,12 +6,12 @@ Go CLI that replaces Peacock VSCode extension by writing colors to `<parent>/<fo
 
 ```bash
 task                  # test
-task build            # → ./ccws
+task build            # → ./bin/ccws
 task install          # → $GOBIN/ccws
 task test:race        # race detector
 task test:integration # gitworktree integration tests (needs git on PATH)
 task lint             # golangci-lint (errcheck, govet, ineffassign, staticcheck, unused + gofmt/goimports check) — CI runs this
-task ci               # lint + test:race
+task ci               # lint + test:race + test:integration
 task fixture          # regenerate golden fixture (needs Node)
 task --list           # full target list
 ```

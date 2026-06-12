@@ -84,7 +84,8 @@ tasks:
       - rm -rf bin/ coverage.out
 
   ci:
-    desc: CI pipeline (lint + race tests)
+    desc: CI pipeline (lint + race tests + integration tests)
     cmds:
       - task: lint
       - task: test:race
+      - task: test:integration
