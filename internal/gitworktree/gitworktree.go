@@ -130,6 +130,14 @@ func FindSelf(worktrees []Worktree, targetDir string) *Worktree {
 // Any failure (git missing, target not in a repo, parse anomaly, bare-only
 // output) collapses to ErrNotInWorktree so callers can silently skip
 // worktree-aware logic and fall through to the existing resolution chain.
+//
+// Linked entries whose .git pointer cannot be read — typically stale
+// worktrees whose directory was deleted without `git worktree remove`
+// (git lists them as "prunable") — are dropped from the result instead of
+// failing the listing: they cannot be the target, and any orphaned
+// <parent>/<folder>.code-workspace they left behind is deliberately
+// ignored (same as after `git worktree prune`), while the live siblings
+// still form a valid family.
 func List(targetDir string) ([]Worktree, error) {
 	cmd := exec.Command("git", "-C", targetDir, "worktree", "list", "--porcelain")
 	out, err := cmd.Output()
@@ -145,14 +153,16 @@ func List(targetDir string) ([]Worktree, error) {
 	}
 	worktrees[0].IsMain = true
 	worktrees[0].GitDir = filepath.Join(worktrees[0].Path, ".git")
+	live := worktrees[:1]
 	for i := 1; i < len(worktrees); i++ {
 		gd, err := readGitDirPointer(worktrees[i].Path)
 		if err != nil {
-			return nil, fmt.Errorf("read .git pointer for %q: %w", worktrees[i].Path, ErrNotInWorktree)
+			continue
 		}
 		worktrees[i].GitDir = gd
+		live = append(live, worktrees[i])
 	}
-	return worktrees, nil
+	return live, nil
 }
 
 // readGitDirPointer reads <path>/.git as a text file (linked worktrees have

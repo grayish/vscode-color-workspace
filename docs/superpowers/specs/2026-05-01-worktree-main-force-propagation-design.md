@@ -354,7 +354,7 @@ warnings = append(warnings, warn)
 | main `.code-workspace` write 실패 | hard error (exit 1, "write main anchor workspace" 컨텍스트). linked 시도 안 함. |
 | linked `.code-workspace` write 실패 | `Result.FailedLinked`에 수집, 다음 linked 계속 시도. 전체 끝나고 main과 다른 linked는 적용된 상태로 종료. exit 1. |
 | linked `.code-workspace` parse 실패 (기존 파일이 깨진 경우) | `Skipped`에 `Reason="parse error: <detail>"`로 분류. 깨진 파일을 조용히 무시하지 않고 사용자에게 명시적으로 보고. write를 시도하지 않으므로 Failed가 아닌 Skipped 카테고리. |
-| linked 디렉토리가 git에 등록되어 있지만 디스크에 없음 | `gitworktree.List`가 `readGitDirPointer`에서 실패 → 전체 ErrNotInWorktree로 fall through (현재 동작). A2 자체가 발동 안 함. |
+| linked 디렉토리가 git에 등록되어 있지만 디스크에 없음 (prunable) | `gitworktree.List`가 해당 엔트리만 drop하고 live worktree들만 반환. A2는 live linked에 대해 정상 발동하며 dead 엔트리는 Targets/Skipped 어디에도 안 나타남. dead 엔트리가 남긴 고아 `.code-workspace`는 무시 (`git worktree prune` 후와 동일한 결과). |
 | `git worktree list` 자체 실패 | 기존 silent skip → A1/A2 모두 미발동 → 기존 fall through. |
 
 `PropagateFailure.Err`은 사용자에게 짧은 사유로 표시 (`permission denied`, `parse error: <detail>` 등). full error는 debug 로그에만.
