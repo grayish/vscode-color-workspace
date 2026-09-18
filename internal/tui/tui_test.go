@@ -3,6 +3,7 @@ package tui
 import (
 	"bytes"
 	"fmt"
+	"os"
 	"strings"
 	"testing"
 )
@@ -204,5 +205,16 @@ func TestShortenPath(t *testing.T) {
 					tt.in, tt.home, got, tt.want)
 			}
 		})
+	}
+}
+
+func TestNewStderr_HonorsNoColor(t *testing.T) {
+	t.Setenv("NO_COLOR", "1")
+	w := NewStderr()
+	if w.color {
+		t.Error("NO_COLOR=1 should disable color on stderr")
+	}
+	if w.out != os.Stderr {
+		t.Error("NewStderr should write to os.Stderr")
 	}
 }
