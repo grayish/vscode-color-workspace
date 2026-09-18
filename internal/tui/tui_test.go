@@ -208,13 +208,17 @@ func TestShortenPath(t *testing.T) {
 	}
 }
 
-func TestNewStderr_HonorsNoColor(t *testing.T) {
+// Diagnostics must go to stderr so that piping stdout to a file still shows
+// warnings. The color assertion only bites when stderr is a TTY: under `go
+// test` stdio is a pipe, so shouldColor already returns false via isatty
+// before NO_COLOR is consulted, and it cannot stand in for a NO_COLOR test.
+func TestNewStderr_WritesToStderr(t *testing.T) {
 	t.Setenv("NO_COLOR", "1")
 	w := NewStderr()
-	if w.color {
-		t.Error("NO_COLOR=1 should disable color on stderr")
-	}
 	if w.out != os.Stderr {
 		t.Error("NewStderr should write to os.Stderr")
+	}
+	if w.color {
+		t.Error("NO_COLOR=1 should disable color on stderr")
 	}
 }
