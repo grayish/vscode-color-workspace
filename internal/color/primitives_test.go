@@ -89,3 +89,53 @@ func TestColor_ToHSL_Hue(t *testing.T) {
 		t.Errorf("green hue = %f, want ~120", h)
 	}
 }
+
+// Achromatic colors have no defined hue, and the HSL conversion is delegated
+// to go-colorful — the round trip must survive regardless of what hue the
+// library reports for them.
+func TestColor_HSLRoundtrip_Achromatic(t *testing.T) {
+	for _, c := range []Color{{0, 0, 0}, {1, 1, 1}, {128, 128, 128}, {254, 254, 254}, {255, 255, 255}} {
+		h, s, l := c.ToHSL()
+		back := FromHSL(h, s, l)
+		if back != c {
+			t.Errorf("Roundtrip(%v) -> %v (h=%f s=%f l=%f)", c, back, h, s, l)
+		}
+	}
+}
+
+// FromHSL documents that out-of-range input is wrapped (hue) or clamped
+// (saturation, lightness) rather than producing a garbage color.
+func TestFromHSL_WrapsAndClamps(t *testing.T) {
+	tests := []struct {
+		name                string
+		h, s, l             float64
+		wantH, wantS, wantL float64
+	}{
+		{"hue above range wraps", 420, 1, 0.5, 60, 1, 0.5},
+		{"hue far above range wraps", 1140, 1, 0.5, 60, 1, 0.5},
+		{"negative hue wraps", -60, 1, 0.5, 300, 1, 0.5},
+		{"hue at 360 wraps to 0", 360, 1, 0.5, 0, 1, 0.5},
+		{"saturation above 1 clamps", 120, 1.5, 0.5, 120, 1, 0.5},
+		{"negative saturation clamps", 120, -0.5, 0.5, 120, 0, 0.5},
+		{"lightness above 1 clamps", 120, 1, 1.5, 120, 1, 1},
+		{"negative lightness clamps", 120, 1, -0.5, 120, 1, 0},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got, want := FromHSL(tt.h, tt.s, tt.l), FromHSL(tt.wantH, tt.wantS, tt.wantL); got != want {
+				t.Errorf("FromHSL(%v, %v, %v) = %v, want %v", tt.h, tt.s, tt.l, got, want)
+			}
+		})
+	}
+}
+
+// Clamping lightness to the extremes yields pure black and white whatever the
+// hue, which is what ApplyLightness relies on at the ends of the ladder.
+func TestFromHSL_ExtremeLightness(t *testing.T) {
+	if got := FromHSL(200, 0.8, 0); got != (Color{0, 0, 0}) {
+		t.Errorf("FromHSL(l=0) = %v, want black", got)
+	}
+	if got := FromHSL(200, 0.8, 1); got != (Color{255, 255, 255}) {
+		t.Errorf("FromHSL(l=1) = %v, want white", got)
+	}
+}
